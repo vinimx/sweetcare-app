@@ -65,6 +65,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(import("./presentation/routes/alerts.routes.js"), { prefix: "/api/v1" });
   // Phase 5 (US3):
   await app.register(import("./presentation/routes/insights.routes.js"), { prefix: "/api/v1" });
+  // Phase 6 (T078 — LGPD data rights):
+  await app.register(import("./presentation/routes/data-rights.routes.js"), { prefix: "/api/v1" });
 
   // ── Global error handler ─────────────────────────────────────────────────
   app.setErrorHandler((error, request, reply) => {

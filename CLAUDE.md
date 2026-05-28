@@ -156,7 +156,8 @@ sweetcare-app/
 │   │   │   │       ├── insulin-record.service.ts      ← createInsulinRecord, listInsulinRecords
 │   │   │   │       ├── symptom-record.service.ts      ← createSymptomRecord, listSymptomRecords (dispara alerta)
 │   │   │   │       ├── sync-batch.service.ts          ← processSyncBatch, getSyncStatus, resolveConflict
-│   │   │   │       └── insight-aggregation.service.ts ← aggregatePatientData (strip PHI → AggregatedRecord[])
+│   │   │   │       ├── insight-aggregation.service.ts ← aggregatePatientData (strip PHI → AggregatedRecord[])
+│   │   │   │       └── data-rights.service.ts         ← exportUserData, deleteUserAccount (LGPD Art. 18)
 │   │   │   ├── infrastructure/
 │   │   │   │   ├── ai/
 │   │   │   │   │   └── ai-service-client.ts  ← callAnalyze (30s timeout + circuit breaker 3/30s)
@@ -189,14 +190,16 @@ sweetcare-app/
 │   │   │       ├── sync.routes.ts          ← POST /sync/batch, GET /sync/status/:id, POST /sync/resolve-conflict
 │   │   │       ├── timeline.routes.ts      ← GET /patients/:id/timeline (insulin+symptom merged)
 │   │   │       ├── alerts.routes.ts        ← GET /patients/:id/alerts, GET /alerts/:id, PATCH /alerts/:id/resolve
-│   │   │       └── insights.routes.ts      ← POST /insights/reports (202), GET /insights/reports/:id, GET /insights/reports
+│   │   │       ├── insights.routes.ts      ← POST /insights/reports (202), GET /insights/reports/:id, GET /insights/reports
+│   │   │       └── data-rights.routes.ts   ← GET /users/me/data-export, DELETE /users/me (LGPD Art. 18)
 │   │   └── tests/
 │   │       ├── setup.ts               ← env vars de test + crypto stub
 │   │       └── integration/
 │   │           ├── auth-flow.test.ts         ← health, register, auth guards
 │   │           ├── sync-flow.test.ts         ← Phase 3 route guards + validation
 │   │           ├── alert-flow.test.ts        ← Phase 4 route guards + alert rule engine (9 casos)
-│   │           └── insights-fallback.test.ts ← Phase 5 route guards + period validation (8 casos)
+│   │           ├── insights-fallback.test.ts ← Phase 5 route guards + period validation (8 casos)
+│   │           └── data-rights.test.ts       ← Phase 6 LGPD route guards (3 casos)
 │   │
 │   ├── mobile/                        ← Expo SDK 52 + React Native 0.76
 │   │   ├── app.json                   ← Bundle IDs, plugins: expo-router, expo-secure-store, expo-sqlite
@@ -418,6 +421,16 @@ User            ──< UserSession   (família de tokens / family invalidation)
 > Fluxo: POST → 202 + fire-and-forget → AI service `/v1/analyze` → `updateReportCompleted/Failed`.
 > Polling via GET até `status = completed | failed`. Requer consentimento `ai_analysis` ativo.
 
+### Phase 6 (T078) — LGPD Data Rights
+
+| Método | Rota                    | Auth   | Status          |
+| ------ | ----------------------- | ------ | --------------- |
+| GET    | `/users/me/data-export` | Bearer | ✅ Implementado |
+| DELETE | `/users/me`             | Bearer | ✅ Implementado |
+
+> `GET /users/me/data-export` retorna todos os dados pessoais do titular (LGPD Art. 18 direito de acesso).
+> `DELETE /users/me` exige confirmação por senha; anonimiza o User (preserva tombstone para integridade FK com AuditEntry) e deleta todos os registros médicos dos pacientes criados pelo usuário.
+
 ---
 
 ## 7. Arquitetura de Segurança
@@ -450,8 +463,8 @@ User            ──< UserSession   (família de tokens / family invalidation)
 | Consentimento do responsável | `ConsentRecord` com `data_processing` obrigatório antes de criar `PatientProfile` |
 | Revogação                    | `DELETE /consent/:id` — freeze de processamento de dados                          |
 | Minimização                  | Somente campos clinicamente necessários coletados                                 |
-| Direito de acesso            | Planejado: `GET /users/me/data-export` (Phase 6 — T078)                           |
-| Direito à exclusão           | Planejado: `DELETE /users/me` + `data-rights.routes.ts` (Phase 6 — T078)          |
+| Direito de acesso            | `GET /users/me/data-export` → JSON com todos os dados do titular (T078 ✅)        |
+| Direito à exclusão           | `DELETE /users/me` + anonimização do User (preserva FK audit_entries) (T078 ✅)   |
 | Notificação de violação      | Runbook documentado em `specs/.../research.md`                                    |
 
 #### Papéis e permissões
@@ -601,14 +614,14 @@ docker compose -f infra/docker/compose.dev.yml logs -f    # Logs
 
 ### Estratégia por camada
 
-| Camada                | Framework          | Localização                   | Status                                                             |
-| --------------------- | ------------------ | ----------------------------- | ------------------------------------------------------------------ |
-| API — unit            | Vitest             | `apps/api/tests/unit/`        | 🔲 Planejado Phase 3+                                              |
-| API — integração      | Vitest             | `apps/api/tests/integration/` | ✅ auth-flow, sync-flow, alert-flow, insights-fallback (46 testes) |
-| Mobile — componentes  | Vitest + RNTL      | `apps/mobile/tests/`          | 🔲 Planejado Phase 3+                                              |
-| AI service — contrato | pytest             | `apps/ai-service/tests/`      | ✅ test_analyze_contract.py (13 casos)                             |
-| E2E mobile            | Detox              | `apps/mobile/e2e/`            | 🔲 Planejado Phase 6                                               |
-| Acessibilidade        | Automated + manual | Screens críticas              | 🔲 Planejado Phase 6                                               |
+| Camada                | Framework          | Localização                   | Status                                                                          |
+| --------------------- | ------------------ | ----------------------------- | ------------------------------------------------------------------------------- |
+| API — unit            | Vitest             | `apps/api/tests/unit/`        | 🔲 Planejado Phase 3+                                                           |
+| API — integração      | Vitest             | `apps/api/tests/integration/` | ✅ auth-flow, sync-flow, alert-flow, insights-fallback, data-rights (49 testes) |
+| Mobile — componentes  | Vitest + RNTL      | `apps/mobile/tests/`          | 🔲 Planejado Phase 3+                                                           |
+| AI service — contrato | pytest             | `apps/ai-service/tests/`      | ✅ test_analyze_contract.py (13 casos)                                          |
+| E2E mobile            | Detox              | `apps/mobile/e2e/`            | 🔲 Planejado Phase 6                                                            |
+| Acessibilidade        | Automated + manual | Screens críticas              | 🔲 Planejado Phase 6                                                            |
 
 ### Executar testes
 
@@ -649,21 +662,21 @@ DATABASE_URL=postgresql://sweetcare:test@localhost:5432/sweetcare_test pnpm --fi
 | Phase 3 — US1 (offline records + sync) | 20      | 20         | 100% ✅ |
 | Phase 4 — US2 (alerts)                 | 10      | 10         | 100% ✅ |
 | Phase 5 — US3 (AI insights)            | 12      | 12         | 100% ✅ |
-| Phase 6 — Polish                       | 9       | 1          | 11% 🔄  |
-| **Total**                              | **80**  | **72**     | **90%** |
+| Phase 6 — Polish                       | 9       | 2          | 22% 🔄  |
+| **Total**                              | **80**  | **73**     | **91%** |
 
 > Rastreamento detalhado em `specs/001-sweetcare-fullstack-foundation/tasks.md`
 
 ### Próximas tarefas desbloqueadas (Phase 6 — Polish)
 
-| Task | Descrição                                                                   | Prioridade |
-| ---- | --------------------------------------------------------------------------- | ---------- |
-| T072 | Auditoria de acessibilidade WCAG 2.1 AA em telas críticas                   | P1         |
-| T074 | Middleware de versionamento de API (`Accept-Version`)                       | P2         |
-| T075 | Propagação de correlation ID (Fastify → AI service → logs)                  | P2         |
-| T076 | Benchmark de performance: p95 ≤ 300ms nos endpoints críticos                | P2         |
-| T077 | ~~Hardening de segurança: verificação OWASP Top 10~~ ✅ Concluído           | P1         |
-| T078 | Endpoint de direitos LGPD: `GET /users/me/data-export` + `DELETE /users/me` | P1         |
+| Task | Descrição                                                                                    | Prioridade |
+| ---- | -------------------------------------------------------------------------------------------- | ---------- |
+| T072 | Auditoria de acessibilidade WCAG 2.1 AA em telas críticas                                    | P1         |
+| T074 | Middleware de versionamento de API (`Accept-Version`)                                        | P2         |
+| T075 | Propagação de correlation ID (Fastify → AI service → logs)                                   | P2         |
+| T076 | Benchmark de performance: p95 ≤ 300ms nos endpoints críticos                                 | P2         |
+| T077 | ~~Hardening de segurança: verificação OWASP Top 10~~ ✅ Concluído                            | P1         |
+| T078 | ~~Endpoint de direitos LGPD: `GET /users/me/data-export` + `DELETE /users/me`~~ ✅ Concluído | P1         |
 
 ---
 
@@ -861,7 +874,21 @@ Impacto: `timeline.routes.ts`; schema de `from`/`to` trocado para `z.string().da
 - Helmet CSP: adicionados `styleSrc`, `imgSrc`, `connectSrc`, `fontSrc`, `frameSrc`, `frameAncestors`, `formAction`
 - Rate limit: `/auth/register` e `/auth/login` com limite de 5 req/15min (anti brute-force)
 
+### 2026-05-28 — T078 (Phase 6) LGPD Data Rights
+
+**Decisão: Anonimização do User em vez de hard-delete**
+Motivação: `actorUserId` em `AuditEntry` é FK obrigatória sem `onDelete` (Prisma Restrict default). Hard-delete de um `User` com audit entries viola a constraint FK — e remover o audit trail seria inaceitável para conformidade. A anonimização (`email → deleted+{id}@sweetcare.invalid`, `passwordHash → ""`, `isActive → false`, PHI fields nulos) preserva o tombstone sem expor dados pessoais.
+Impacto: `data-rights.service.ts:deleteUserAccount`; `User` com `isActive=false` e email anonimizado não consegue logar (auth service rejeita `isActive=false`); todas as sessions revogadas antes da anonimização.
+
+**Decisão: Deleção em cascata manual (não `onDelete: Cascade`) para dados dos pacientes do usuário**
+Motivação: Cascade no Prisma schema deletaria registros médicos de forma silenciosa a qualquer deleção de PatientProfile, inclusive operações administrativas acidentais. A deleção manual explícita em `prisma.$transaction` na ordem correta (InsightReport → SyncEvent → AlertEvent → SymptomRecord → InsulinApplicationRecord → CaregiverAssignment → ConsentRecord → PatientProfile) é auditável, reversível via dump, e falha ruidosamente se a ordem estiver errada.
+Impacto: `data-rights.service.ts`; sem mudanças no schema Prisma nem migrations.
+
+**Decisão: Verificação de senha antes de qualquer operação destrutiva**
+Motivação: A deleção de conta é irreversível. Exigir confirmação de senha (LGPD Art. 18 §3º) previne deleções acidentais e garante que só o titular autenticado pode exercer o direito à exclusão, mesmo em sessões sequestradas (refresh token roubado).
+Impacto: `data-rights.routes.ts` exige `{ password }` no body; `deleteUserAccount` chama `verifyPassword` antes de qualquer TX.
+
 ---
 
-_Última atualização: 2026-05-28 — T077 Security Hardening (Phase 6) completo_
-_Próxima atualização obrigatória: ao iniciar T072 acessibilidade ou T078 LGPD data rights_
+_Última atualização: 2026-05-28 — T078 LGPD Data Rights (Phase 6) completo_
+_Próxima atualização obrigatória: ao iniciar T072 acessibilidade, T074 API versioning ou T075 correlation ID_

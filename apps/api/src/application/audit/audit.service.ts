@@ -66,3 +66,7 @@ export function auditConsentRevoked(params: Omit<AuditParams, "operation">): Pro
 export function auditAlertGenerated(params: Omit<AuditParams, "operation">): Promise<void> {
   return writeAuditEntry({ ...params, operation: "alert_generated" });
 }
+
+export function auditDelete(params: Omit<AuditParams, "operation">): Promise<void> {
+  return writeAuditEntry({ ...params, operation: "delete" });
+}
