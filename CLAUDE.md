@@ -184,7 +184,7 @@ sweetcare-app/
 │   │   │   │       └── insight-report.repository.ts    ← createInsightReport, getReportById, listPatientReports, updateReportCompleted/Failed
 │   │   │   └── presentation/routes/
 │   │   │       ├── health.routes.ts        ← GET /health + GET /ready
-│   │   │       ├── auth.routes.ts          ← register, login, refresh, logout, MFA stub
+│   │   │       ├── auth.routes.ts          ← GET /users/me, register, login, refresh, logout, MFA stub
 │   │   │       ├── consent.routes.ts       ← POST /consent, DELETE /consent/:id
 │   │   │       ├── patients.routes.ts      ← POST /patients, GET /patients/:id
 │   │   │       ├── insulin-records.routes.ts ← POST+GET /patients/:id/insulin-records
@@ -432,15 +432,18 @@ User            ──< UserSession   (família de tokens / family invalidation)
 
 ### Autenticação e Sessão
 
-| Método | Rota                  | Auth                      | Status          |
-| ------ | --------------------- | ------------------------- | --------------- |
-| POST   | `/auth/register`      | —                         | ✅ Implementado |
-| POST   | `/auth/login`         | —                         | ✅ Implementado |
-| POST   | `/auth/refresh`       | Cookie `sc_refresh_token` | ✅ Implementado |
-| POST   | `/auth/logout`        | Bearer                    | ✅ Implementado |
-| POST   | `/auth/mfa/verify`    | —                         | 🔲 Stub (501)   |
-| POST   | `/consent`            | Bearer                    | ✅ Implementado |
-| DELETE | `/consent/:consentId` | Bearer                    | ✅ Implementado |
+| Método | Rota                  | Auth                          | Status          |
+| ------ | --------------------- | ----------------------------- | --------------- |
+| GET    | `/users/me`           | Bearer                        | ✅ Implementado |
+| POST   | `/auth/register`      | —                             | ✅ Implementado |
+| POST   | `/auth/login`         | —                             | ✅ Implementado |
+| POST   | `/auth/refresh`       | Cookie ou body `refreshToken` | ✅ Implementado |
+| POST   | `/auth/logout`        | Bearer                        | ✅ Implementado |
+| POST   | `/auth/mfa/verify`    | —                             | 🔲 Stub (501)   |
+| POST   | `/consent`            | Bearer                        | ✅ Implementado |
+| DELETE | `/consent/:consentId` | Bearer                        | ✅ Implementado |
+
+> `POST /auth/register` e `POST /auth/login` retornam `refreshToken` tanto no body JSON quanto em cookie HttpOnly — body necessário para clientes mobile (React Native `fetch` não persiste cookies); cookie para web.
 
 ### Operações
 
@@ -1015,4 +1018,18 @@ Impacto: `app/emergency.tsx` copia os protocolos de `alert-event.entity.ts` como
 Motivação: O schema `createPatientSchema` do Zod já existe em `@sweetcare/shared-validation`, mas react-hook-form + zod no modal de criação de paciente adicionaria overhead de bundle para um formulário simples. Validação inline com função `validate()` cobre todos os campos sem nova dependência.
 Impacto: `app/patients/new.tsx`; padrão distinto do InsulinLogScreen (que usa react-hook-form) pois o formulário de paciente é usado apenas uma vez no onboarding.
 
-_Última atualização: 2026-05-28 — Mobile completo (auth, navegação, 8 novas telas) — 80/80 tarefas_
+### 2026-05-28 — Correção de contrato API↔Mobile
+
+**Decisão: `refreshToken` entregue tanto no body JSON quanto em cookie HttpOnly**
+Motivação: React Native `fetch` não persiste cookies HttpOnly automaticamente entre requests — tokens guardados apenas em cookie são inacessíveis ao `expo-secure-store`. A solução entrega o token nos dois canais: cookie HttpOnly (para clientes web/browser) e campo `refreshToken` no body JSON (para mobile salvar no Keychain/Keystore via `tokenStorage`).
+Impacto: `auth.routes.ts` — `POST /auth/register`, `POST /auth/login` e `POST /auth/refresh` retornam `refreshToken` no body; `AuthContext.tsx` salva via `tokenStorage.saveRefreshToken()`; cookie continua sendo setado em paralelo para compatibilidade web.
+
+**Decisão: `GET /users/me` adicionado a `auth.routes.ts` (não em rota separada)**
+Motivação: O endpoint precisa de `app.authenticate` e retorna dados do próprio usuário autenticado — colocá-lo em `auth.routes.ts` junto com os demais fluxos de sessão evita criar um arquivo de rota com um único endpoint.
+Impacto: `auth.routes.ts` expõe `GET /users/me` protegido por Bearer; `AuthContext.tsx` usa-o em `loadStoredSession()` para restaurar sessão ao abrir o app.
+
+**Decisão: `POST /auth/register` faz auto-login e retorna tokens (201 com `authResponseSchema`)**
+Motivação: O fluxo de onboarding do mobile necessita tokens imediatamente após o registro para navegar para o app sem uma segunda chamada de login. O service `register()` só cria o usuário — o handler agora chama `login()` internamente e retorna o payload completo.
+Impacto: `auth.routes.ts`; response de `POST /auth/register` mudou de `{ userId }` para `authResponseSchema` (mesmo formato do login).
+
+_Última atualização: 2026-05-28 — Correção de contrato API↔Mobile + TypeScript fixes (mobile e API)_
