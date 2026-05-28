@@ -46,6 +46,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   // ── Security & auth plugins ──────────────────────────────────────────────
   await app.register(import("./infrastructure/http/security-plugins.js"));
   await app.register(import("./infrastructure/auth/jwt.plugin.js"));
+  // ── Observability plugins (global scope via fastify-plugin) ──────────────
+  await app.register(import("./infrastructure/http/correlation.plugin.js"));
+  await app.register(import("./infrastructure/http/versioning.plugin.js"));
 
   // ── Routes ───────────────────────────────────────────────────────────────
   await app.register(import("./presentation/routes/health.routes.js"), { prefix: "/api/v1" });
@@ -67,6 +70,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(import("./presentation/routes/insights.routes.js"), { prefix: "/api/v1" });
   // Phase 6 (T078 — LGPD data rights):
   await app.register(import("./presentation/routes/data-rights.routes.js"), { prefix: "/api/v1" });
+  // Phase 6 (T079 — Prometheus metrics, no /api/v1 prefix):
+  await app.register(import("./presentation/routes/monitoring.routes.js"));
 
   // ── Global error handler ─────────────────────────────────────────────────
   app.setErrorHandler((error, request, reply) => {

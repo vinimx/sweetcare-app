@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   backButtonText: { color: "#fff", fontWeight: "600", fontSize: 15 },
-  backLink: { paddingHorizontal: 16, paddingTop: 16 },
+  backLink: { paddingHorizontal: 16, paddingTop: 16, minHeight: 44, justifyContent: "center" },
   backLinkText: { fontSize: 15, color: "#2563EB", fontWeight: "500" },
   disclaimerBox: {
     margin: 16,

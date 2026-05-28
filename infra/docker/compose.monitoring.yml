@@ -1,0 +1,56 @@
+name: sweetcare-monitoring
+
+# Monitoring stack — Prometheus + Grafana
+# Usage: docker compose -f infra/docker/compose.monitoring.yml up -d
+# Prerequisites: sweetcare-dev stack must be running (compose.dev.yml)
+# Grafana: http://localhost:3001  (admin / changeme)
+# Prometheus: http://localhost:9090
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: sweetcare-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      # Allows scraping the API running directly on the host (pnpm dev)
+      - "host.docker.internal:host-gateway"
+    networks:
+      - sweetcare-dev_default
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: sweetcare-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: changeme
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/sweetcare.json
+    volumes:
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - sweetcare-dev_default
+
+networks:
+  sweetcare-dev_default:
+    # Joins the default network created by compose.dev.yml
+    external: true
+
+volumes:
+  prometheus_data:
+  grafana_data:

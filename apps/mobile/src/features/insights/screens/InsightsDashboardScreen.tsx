@@ -268,6 +268,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "#E5E7EB",
     marginRight: 8,
+    minHeight: 44,
+    justifyContent: "center",
   },
   typeChipSelected: { backgroundColor: "#2563EB" },
   typeChipText: { fontSize: 14, color: "#374151" },

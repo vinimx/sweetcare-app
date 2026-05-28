@@ -1,0 +1,158 @@
+{
+  "annotations": { "list": [] },
+  "description": "SweetCare API — Node.js process metrics",
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Uptime",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "process_uptime_seconds",
+          "legendFormat": "uptime"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Heap Used",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 200000000 },
+              { "color": "red", "value": 400000000 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "nodejs_heap_used_bytes",
+          "legendFormat": "heap used"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "RSS",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 300000000 },
+              { "color": "red", "value": 600000000 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "nodejs_rss_bytes",
+          "legendFormat": "RSS"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Heap Memory Usage",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" }
+      },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "nodejs_heap_used_bytes",
+          "legendFormat": "heap used"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "nodejs_heap_total_bytes",
+          "legendFormat": "heap total"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Process Memory",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" }
+      },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "nodejs_rss_bytes",
+          "legendFormat": "RSS"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "nodejs_external_memory_bytes",
+          "legendFormat": "external"
+        }
+      ]
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 37,
+  "style": "dark",
+  "tags": ["sweetcare", "api", "nodejs"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SweetCare API",
+  "uid": "sweetcare-api-v1",
+  "version": 1
+}
