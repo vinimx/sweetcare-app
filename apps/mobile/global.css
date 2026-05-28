@@ -1,0 +1,193 @@
+/* SweetCare Design System — CSS Custom Properties v1.0.0
+ * Source of truth: src/design/themes/colors.ts
+ * Used by web companions and for documentation reference.
+ * React Native screens consume tokens via useTheme() — not this file.
+ */
+
+:root {
+  /* ── Brand Blue ─────────────────────────────────── */
+  --color-blue-50:  #EFF6FF;
+  --color-blue-100: #DBEAFE;
+  --color-blue-200: #BFDBFE;
+  --color-blue-300: #93C5FD;
+  --color-blue-400: #60A5FA;
+  --color-blue-500: #3B82F6;
+  --color-blue-600: #2563EB; /* primary */
+  --color-blue-700: #1D4ED8;
+  --color-blue-800: #1E40AF;
+  --color-blue-900: #1E3A8A;
+
+  /* ── Slate (neutros) ────────────────────────────── */
+  --color-slate-50:  #F8FAFC;
+  --color-slate-100: #F1F5F9;
+  --color-slate-200: #E2E8F0;
+  --color-slate-300: #CBD5E1;
+  --color-slate-400: #94A3B8;
+  --color-slate-500: #64748B;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1E293B;
+  --color-slate-900: #0F172A;
+
+  /* ── Green (sucesso / glicemia normal) ──────────── */
+  --color-green-50:  #F0FDF4;
+  --color-green-100: #DCFCE7;
+  --color-green-200: #BBF7D0;
+  --color-green-500: #22C55E;
+  --color-green-600: #16A34A;
+  --color-green-700: #15803D;
+  --color-green-900: #14532D;
+
+  /* ── Amber (atenção / hiperglicemia leve) ───────── */
+  --color-amber-50:  #FFFBEB;
+  --color-amber-100: #FEF3C7;
+  --color-amber-200: #FDE68A;
+  --color-amber-500: #F59E0B;
+  --color-amber-600: #D97706;
+  --color-amber-700: #B45309;
+  --color-amber-900: #78350F;
+
+  /* ── Orange (hipoglicemia leve) ─────────────────── */
+  --color-orange-50:  #FFF7ED;
+  --color-orange-100: #FFEDD5;
+  --color-orange-200: #FED7AA;
+  --color-orange-500: #F97316;
+  --color-orange-600: #EA580C;
+  --color-orange-700: #C2410C;
+
+  /* ── Red (emergência / erros críticos) ──────────── */
+  --color-red-50:  #FEF2F2;
+  --color-red-100: #FEE2E2;
+  --color-red-200: #FECACA;
+  --color-red-400: #F87171;
+  --color-red-500: #EF4444;
+  --color-red-600: #DC2626; /* emergency header */
+  --color-red-700: #B91C1C;
+  --color-red-800: #991B1B;
+  --color-red-900: #7F1D1D; /* emergency modal bg */
+
+  /* ── Semantic tokens ────────────────────────────── */
+  --color-primary:         var(--color-blue-600);
+  --color-primary-light:   var(--color-blue-400);
+  --color-primary-dark:    var(--color-blue-700);
+  --color-primary-surface: var(--color-blue-50);
+  --color-primary-border:  var(--color-blue-200);
+
+  --color-bg:              var(--color-slate-50);
+  --color-surface:         #FFFFFF;
+  --color-surface-subtle:  var(--color-slate-50);
+
+  --color-text-primary:    var(--color-slate-900);
+  --color-text-secondary:  var(--color-slate-600);
+  --color-text-tertiary:   var(--color-slate-400);
+  --color-text-disabled:   var(--color-slate-300);
+  --color-text-inverse:    #FFFFFF;
+  --color-text-link:       var(--color-blue-600);
+  --color-text-error:      var(--color-red-600);
+
+  --color-border:          var(--color-slate-200);
+  --color-border-subtle:   var(--color-slate-100);
+  --color-border-strong:   var(--color-slate-300);
+
+  /* ── Feedback ───────────────────────────────────── */
+  --color-success:         var(--color-green-600);
+  --color-success-surface: var(--color-green-50);
+  --color-success-border:  var(--color-green-200);
+
+  --color-warning:         var(--color-amber-600);
+  --color-warning-surface: var(--color-amber-50);
+  --color-warning-border:  var(--color-amber-200);
+
+  --color-error:           var(--color-red-600);
+  --color-error-surface:   var(--color-red-50);
+  --color-error-border:    var(--color-red-200);
+
+  --color-info:            var(--color-blue-600);
+  --color-info-surface:    var(--color-blue-50);
+  --color-info-border:     var(--color-blue-200);
+
+  /* ── Glicemia (padrão clínico) ───────────────────── */
+  --color-glucose-normal:          var(--color-green-600);
+  --color-glucose-normal-surface:  var(--color-green-50);
+  --color-glucose-normal-border:   var(--color-green-200);
+  --color-glucose-high:            var(--color-amber-600);
+  --color-glucose-high-surface:    var(--color-amber-50);
+  --color-glucose-high-border:     var(--color-amber-200);
+  --color-glucose-low:             var(--color-orange-600);
+  --color-glucose-low-surface:     var(--color-orange-50);
+  --color-glucose-low-border:      var(--color-orange-200);
+  --color-glucose-critical:        var(--color-red-600);
+  --color-glucose-critical-surface:var(--color-red-50);
+  --color-glucose-critical-border: var(--color-red-200);
+  --color-glucose-unknown:         var(--color-slate-400);
+  --color-glucose-unknown-surface: var(--color-slate-100);
+
+  /* ── Severidade ─────────────────────────────────── */
+  --color-severity-mild-text:      var(--color-amber-700);
+  --color-severity-mild-surface:   var(--color-amber-50);
+  --color-severity-mild-border:    var(--color-amber-200);
+  --color-severity-moderate-text:  var(--color-orange-700);
+  --color-severity-moderate-surface:var(--color-orange-50);
+  --color-severity-moderate-border:var(--color-orange-200);
+  --color-severity-severe-text:    var(--color-red-700);
+  --color-severity-severe-surface: var(--color-red-50);
+  --color-severity-severe-border:  var(--color-red-200);
+  --color-severity-emergency-text: #FFFFFF;
+  --color-severity-emergency-bg:   var(--color-red-600);
+  --color-severity-emergency-border:var(--color-red-700);
+
+  /* ── Sync status ────────────────────────────────── */
+  --color-sync-pending:         var(--color-amber-600);
+  --color-sync-pending-surface: var(--color-amber-50);
+  --color-sync-synced:          var(--color-green-600);
+  --color-sync-synced-surface:  var(--color-green-50);
+  --color-sync-conflict:        var(--color-red-600);
+  --color-sync-conflict-surface:var(--color-red-50);
+
+  /* ── Typography ─────────────────────────────────── */
+  --font-size-xs:  12px;
+  --font-size-sm:  14px;
+  --font-size-md:  16px;
+  --font-size-lg:  18px;
+  --font-size-xl:  20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 30px;
+  --font-size-4xl: 36px;
+
+  --font-weight-regular:  400;
+  --font-weight-medium:   500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:     700;
+
+  /* ── Spacing (4pt grid) ─────────────────────────── */
+  --space-0:   0px;
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-11:  44px; /* WCAG touch target min */
+  --space-12:  48px;
+  --space-14:  56px; /* tab bar min */
+  --space-16:  64px; /* emergency button */
+
+  /* ── Border radius ───────────────────────────────── */
+  --radius-xs:   2px;
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-2xl:  24px;
+  --radius-full: 9999px;
+
+  /* ── Shadows ─────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgba(15,23,42,0.06);
+  --shadow-md: 0 2px 6px rgba(15,23,42,0.08);
+  --shadow-lg: 0 4px 12px rgba(15,23,42,0.12);
+  --shadow-xl: 0 8px 24px rgba(15,23,42,0.16);
+  --shadow-emergency: 0 4px 12px rgba(220,38,38,0.30);
+  --shadow-success:   0 2px 8px  rgba(22,163,74,0.20);
+}

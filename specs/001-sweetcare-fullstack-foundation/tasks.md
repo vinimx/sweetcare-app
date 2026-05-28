@@ -74,26 +74,26 @@ No user story work can begin until Phase 2 (Foundational) is complete, but setup
 
 ### Implementation for User Story 1
 
-- [ ] T030 [P] [US1] Implement InsulinApplicationRecord domain entity with validation rules (dose bounds, rationale constraints) in `apps/api/src/domain/entities/insulin-application-record.entity.ts`
-- [ ] T031 [P] [US1] Implement SymptomRecord domain entity with severity-symptom consistency rules in `apps/api/src/domain/entities/symptom-record.entity.ts`
-- [ ] T032 [US1] Implement InsulinApplicationRecord repository (idempotent upsert via client_id) in `apps/api/src/infrastructure/repositories/insulin-record.repository.ts`
-- [ ] T033 [P] [US1] Implement SymptomRecord repository in `apps/api/src/infrastructure/repositories/symptom-record.repository.ts`
-- [ ] T034 [US1] Implement InsulinApplicationRecord application service with audit integration in `apps/api/src/application/services/insulin-record.service.ts`
-- [ ] T035 [P] [US1] Implement SymptomRecord application service with audit integration in `apps/api/src/application/services/symptom-record.service.ts`
-- [ ] T036 [US1] Implement sync batch service with conflict detection (overlapping_insulin_window rule) in `apps/api/src/application/services/sync-batch.service.ts`
-- [ ] T037 [P] [US1] Implement CaregiverAssignment authorization guard (per-patient access check) in `apps/api/src/domain/services/caregiver-access.guard.ts`
-- [ ] T038 [US1] Implement POST /v1/patients and GET /v1/patients/{id} routes per `contracts/api-medical-records.md` in `apps/api/src/presentation/routes/patients.routes.ts`
-- [ ] T039 [P] [US1] Implement POST /v1/patients/{id}/insulin-records and GET routes in `apps/api/src/presentation/routes/insulin-records.routes.ts`
-- [ ] T040 [P] [US1] Implement POST /v1/patients/{id}/symptoms and GET routes in `apps/api/src/presentation/routes/symptom-records.routes.ts`
-- [ ] T041 [US1] Implement POST /v1/sync/batch, GET /v1/sync/status, POST /v1/sync/resolve-conflict per `contracts/api-sync.md` in `apps/api/src/presentation/routes/sync.routes.ts`
-- [ ] T042 [US1] Implement GET /v1/patients/{id}/timeline composite feed endpoint in `apps/api/src/presentation/routes/timeline.routes.ts`
-- [ ] T043 [P] [US1] Implement offline SQLite schema and record repository in `apps/mobile/src/infrastructure/storage/offline-db.ts`
-- [ ] T044 [US1] Implement offline mutation queue with React Query `persistQueryClient` in `apps/mobile/src/infrastructure/sync/offline-queue.ts`
-- [ ] T045 [US1] Implement sync engine with auto-trigger on connectivity restore in `apps/mobile/src/infrastructure/sync/sync-engine.ts`
-- [ ] T046 [P] [US1] Build insulin logging screen with react-hook-form + Zod validation in `apps/mobile/src/features/insulin/screens/InsulinLogScreen.tsx`
-- [ ] T047 [P] [US1] Build symptom recording screen in `apps/mobile/src/features/symptoms/screens/SymptomRecordScreen.tsx`
-- [ ] T048 [US1] Build sync status indicator component and conflict resolution UI in `apps/mobile/src/features/sync/components/SyncStatusBar.tsx`
-- [ ] T049 [US1] Write integration tests for offline-sync flow (offline write → sync → idempotency → conflict) in `apps/api/tests/integration/sync-flow.test.ts`
+- [x] T030 [P] [US1] Implement InsulinApplicationRecord domain entity with validation rules (dose bounds, rationale constraints) in `apps/api/src/domain/entities/insulin-application-record.entity.ts`
+- [x] T031 [P] [US1] Implement SymptomRecord domain entity with severity-symptom consistency rules in `apps/api/src/domain/entities/symptom-record.entity.ts`
+- [x] T032 [US1] Implement InsulinApplicationRecord repository (idempotent upsert via client_id) in `apps/api/src/infrastructure/repositories/insulin-record.repository.ts`
+- [x] T033 [P] [US1] Implement SymptomRecord repository in `apps/api/src/infrastructure/repositories/symptom-record.repository.ts`
+- [x] T034 [US1] Implement InsulinApplicationRecord application service with audit integration in `apps/api/src/application/services/insulin-record.service.ts`
+- [x] T035 [P] [US1] Implement SymptomRecord application service with audit integration in `apps/api/src/application/services/symptom-record.service.ts`
+- [x] T036 [US1] Implement sync batch service with conflict detection (overlapping_insulin_window rule) in `apps/api/src/application/services/sync-batch.service.ts`
+- [x] T037 [P] [US1] Implement CaregiverAssignment authorization guard (per-patient access check) in `apps/api/src/domain/services/caregiver-access.guard.ts`
+- [x] T038 [US1] Implement POST /v1/patients and GET /v1/patients/{id} routes per `contracts/api-medical-records.md` in `apps/api/src/presentation/routes/patients.routes.ts`
+- [x] T039 [P] [US1] Implement POST /v1/patients/{id}/insulin-records and GET routes in `apps/api/src/presentation/routes/insulin-records.routes.ts`
+- [x] T040 [P] [US1] Implement POST /v1/patients/{id}/symptoms and GET routes in `apps/api/src/presentation/routes/symptom-records.routes.ts`
+- [x] T041 [US1] Implement POST /v1/sync/batch, GET /v1/sync/status, POST /v1/sync/resolve-conflict per `contracts/api-sync.md` in `apps/api/src/presentation/routes/sync.routes.ts`
+- [x] T042 [US1] Implement GET /v1/patients/{id}/timeline composite feed endpoint in `apps/api/src/presentation/routes/timeline.routes.ts`
+- [x] T043 [P] [US1] Implement offline SQLite schema and record repository in `apps/mobile/src/infrastructure/storage/offline-db.ts`
+- [x] T044 [US1] Implement offline mutation queue with React Query `persistQueryClient` in `apps/mobile/src/infrastructure/sync/offline-queue.ts`
+- [x] T045 [US1] Implement sync engine with auto-trigger on connectivity restore in `apps/mobile/src/infrastructure/sync/sync-engine.ts`
+- [x] T046 [P] [US1] Build insulin logging screen with react-hook-form + Zod validation in `apps/mobile/src/features/insulin/screens/InsulinLogScreen.tsx`
+- [x] T047 [P] [US1] Build symptom recording screen in `apps/mobile/src/features/symptoms/screens/SymptomRecordScreen.tsx`
+- [x] T048 [US1] Build sync status indicator component and conflict resolution UI in `apps/mobile/src/features/sync/components/SyncStatusBar.tsx`
+- [x] T049 [US1] Write integration tests for offline-sync flow (offline write → sync → idempotency → conflict) in `apps/api/tests/integration/sync-flow.test.ts`
 
 **Checkpoint**: Quickstart.md Cenário 1 passes completely. All acceptance scenarios from spec.md US1 validated.
 
@@ -107,16 +107,16 @@ No user story work can begin until Phase 2 (Foundational) is complete, but setup
 
 ### Implementation for User Story 2
 
-- [ ] T050 [P] [US2] Implement AlertEvent domain entity with alert type and rule-mapping logic in `apps/api/src/domain/entities/alert-event.entity.ts`
-- [ ] T051 [US2] Implement synchronous rule engine that maps symptom codes + severity to alert types per `contracts/api-alerts.md` in `apps/api/src/domain/services/alert-rule-engine.ts`
-- [ ] T052 [US2] Integrate alert generation into SymptomRecord application service (same transaction for emergency severity) in `apps/api/src/application/services/symptom-record.service.ts`
-- [ ] T053 [P] [US2] Implement AlertEvent repository in `apps/api/src/infrastructure/repositories/alert-event.repository.ts`
-- [ ] T054 [US2] Implement push notification service (FCM/APNs) with PHI-free payload per `contracts/api-alerts.md` in `apps/api/src/infrastructure/notifications/push-notification.service.ts`
-- [ ] T055 [P] [US2] Implement GET /v1/patients/{id}/alerts, GET /v1/alerts/{id}, PATCH /v1/alerts/{id}/resolve per `contracts/api-alerts.md` in `apps/api/src/presentation/routes/alerts.routes.ts`
-- [ ] T056 [US2] Build alert detail screen with emergency guidance display (seek_emergency_care = true → prominent call button) in `apps/mobile/src/features/alerts/screens/AlertDetailScreen.tsx`
-- [ ] T057 [P] [US2] Build emergency protocol screen (lock-screen-style, no auth required to view once unlocked) in `apps/mobile/src/features/alerts/screens/EmergencyProtocolScreen.tsx`
-- [ ] T058 [US2] Integrate push notification handling and deep-link routing to alert screen in `apps/mobile/src/infrastructure/notifications/notification-handler.ts`
-- [ ] T059 [US2] Write integration tests for alert generation flow (symptom → alert → push → resolve) in `apps/api/tests/integration/alert-flow.test.ts`
+- [x] T050 [P] [US2] Implement AlertEvent domain entity with alert type and rule-mapping logic in `apps/api/src/domain/entities/alert-event.entity.ts`
+- [x] T051 [US2] Implement synchronous rule engine that maps symptom codes + severity to alert types per `contracts/api-alerts.md` in `apps/api/src/domain/services/alert-rule-engine.ts`
+- [x] T052 [US2] Integrate alert generation into SymptomRecord application service (same transaction for emergency severity) in `apps/api/src/application/services/symptom-record.service.ts`
+- [x] T053 [P] [US2] Implement AlertEvent repository in `apps/api/src/infrastructure/repositories/alert-event.repository.ts`
+- [x] T054 [US2] Implement push notification service (FCM/APNs) with PHI-free payload per `contracts/api-alerts.md` in `apps/api/src/infrastructure/notifications/push-notification.service.ts`
+- [x] T055 [P] [US2] Implement GET /v1/patients/{id}/alerts, GET /v1/alerts/{id}, PATCH /v1/alerts/{id}/resolve per `contracts/api-alerts.md` in `apps/api/src/presentation/routes/alerts.routes.ts`
+- [x] T056 [US2] Build alert detail screen with emergency guidance display (seek_emergency_care = true → prominent call button) in `apps/mobile/src/features/alerts/screens/AlertDetailScreen.tsx`
+- [x] T057 [P] [US2] Build emergency protocol screen (lock-screen-style, no auth required to view once unlocked) in `apps/mobile/src/features/alerts/screens/EmergencyProtocolScreen.tsx`
+- [x] T058 [US2] Integrate push notification handling and deep-link routing to alert screen in `apps/mobile/src/infrastructure/notifications/notification-handler.ts`
+- [x] T059 [US2] Write integration tests for alert generation flow (symptom → alert → push → resolve) in `apps/api/tests/integration/alert-flow.test.ts`
 
 **Checkpoint**: Quickstart.md Cenário 2 passes. Emergency screen loads ≤ 2s. Accessibility check passes on critical screens.
 
@@ -130,18 +130,18 @@ No user story work can begin until Phase 2 (Foundational) is complete, but setup
 
 ### Implementation for User Story 3
 
-- [ ] T060 [P] [US3] Implement InsightReport domain entity in `apps/api/src/domain/entities/insight-report.entity.ts`
-- [ ] T061 [US3] Implement data aggregation pipeline that strips PHI before forwarding to AI service in `apps/api/src/application/services/insight-aggregation.service.ts`
-- [ ] T062 [US3] Implement InsightReport repository in `apps/api/src/infrastructure/repositories/insight-report.repository.ts`
-- [ ] T063 [P] [US3] Implement AI service HTTP client with 30s timeout, retry, and circuit breaker in `apps/api/src/infrastructure/ai/ai-service-client.ts`
-- [ ] T064 [US3] Implement Fastify proxy routes POST /v1/insights/reports, GET /v1/insights/reports/{id}, GET /v1/insights/reports per `contracts/api-insights.md` in `apps/api/src/presentation/routes/insights.routes.ts`
-- [ ] T065 [P] [US3] Implement FastAPI POST /v1/analyze endpoint with Pydantic schemas in `apps/ai-service/app/api/analyze.py`
-- [ ] T066 [P] [US3] Implement statistical analysis service (glucose patterns, insulin effectiveness) in `apps/ai-service/app/services/analysis_service.py`
-- [ ] T067 [US3] Implement confidence context generator and model-limitation warnings in `apps/ai-service/app/services/confidence_service.py`
-- [ ] T068 [US3] Build insights dashboard screen with disclaimer-first layout in `apps/mobile/src/features/insights/screens/InsightsDashboardScreen.tsx`
-- [ ] T069 [P] [US3] Build report detail screen with pattern findings and confidence indicators in `apps/mobile/src/features/insights/screens/ReportDetailScreen.tsx`
-- [ ] T070 [US3] Write contract tests for AI service input/output schema (pytest) in `apps/ai-service/tests/test_analyze_contract.py`
-- [ ] T071 [US3] Write integration test: AI service unavailable → Fastify returns 503 → core flows unaffected in `apps/api/tests/integration/insights-fallback.test.ts`
+- [x] T060 [P] [US3] Implement InsightReport domain entity in `apps/api/src/domain/entities/insight-report.entity.ts`
+- [x] T061 [US3] Implement data aggregation pipeline that strips PHI before forwarding to AI service in `apps/api/src/application/services/insight-aggregation.service.ts`
+- [x] T062 [US3] Implement InsightReport repository in `apps/api/src/infrastructure/repositories/insight-report.repository.ts`
+- [x] T063 [P] [US3] Implement AI service HTTP client with 30s timeout, retry, and circuit breaker in `apps/api/src/infrastructure/ai/ai-service-client.ts`
+- [x] T064 [US3] Implement Fastify proxy routes POST /v1/insights/reports, GET /v1/insights/reports/{id}, GET /v1/insights/reports per `contracts/api-insights.md` in `apps/api/src/presentation/routes/insights.routes.ts`
+- [x] T065 [P] [US3] Implement FastAPI POST /v1/analyze endpoint with Pydantic schemas in `apps/ai-service/app/api/analyze.py`
+- [x] T066 [P] [US3] Implement statistical analysis service (glucose patterns, insulin effectiveness) in `apps/ai-service/app/services/analysis_service.py`
+- [x] T067 [US3] Implement confidence context generator and model-limitation warnings in `apps/ai-service/app/services/confidence_service.py`
+- [x] T068 [US3] Build insights dashboard screen with disclaimer-first layout in `apps/mobile/src/features/insights/screens/InsightsDashboardScreen.tsx`
+- [x] T069 [P] [US3] Build report detail screen with pattern findings and confidence indicators in `apps/mobile/src/features/insights/screens/ReportDetailScreen.tsx`
+- [x] T070 [US3] Write contract tests for AI service input/output schema (pytest) in `apps/ai-service/tests/test_analyze_contract.py`
+- [x] T071 [US3] Write integration test: AI service unavailable → Fastify returns 503 → core flows unaffected in `apps/api/tests/integration/insights-fallback.test.ts`
 
 **Checkpoint**: Quickstart.md Cenário 3 passes. Disclaimer displayed before all insight content. AI outage does not affect insulin/symptom/alert flows.
 
@@ -151,15 +151,15 @@ No user story work can begin until Phase 2 (Foundational) is complete, but setup
 
 **Purpose**: Accessibility, performance, security hardening, observability, and operational readiness across all stories.
 
-- [ ] T072 [P] Run WCAG 2.1 AA automated accessibility audit on all critical screens (insulin log, symptom record, alert detail, emergency protocol) and fix violations in `apps/mobile/src/features/`
-- [ ] T073 [P] Add accessibility manual validation checklist: touch targets ≥ 44px, minimum 16sp critical text, screen reader labels in `specs/001-sweetcare-fullstack-foundation/checklists/accessibility.md`
-- [ ] T074 [P] Implement API versioning middleware with `Accept-Version` header support in `apps/api/src/infrastructure/http/versioning.plugin.ts`
-- [ ] T075 [P] Implement request correlation ID propagation (Fastify → AI service → logs) in `apps/api/src/infrastructure/http/correlation.plugin.ts`
-- [ ] T076 Performance benchmark: validate p95 ≤ 300ms on POST /v1/insulin-records, POST /v1/symptoms, GET /v1/patients/{id}/timeline per quickstart.md criteria; document results in `specs/001-sweetcare-fullstack-foundation/performance-baseline.md`
-- [ ] T077 [P] Security hardening: verify all OWASP controls (rate limiting, CORS, HSTS, CSP, input validation, SQL injection guard via Prisma) in `apps/api/src/`
-- [ ] T078 [P] Implement data retention policy: audit log retention config and LGPD right-to-erasure endpoint skeleton in `apps/api/src/presentation/routes/data-rights.routes.ts`
-- [ ] T079 [P] Setup Prometheus metrics export (`/metrics`) and Grafana dashboard config in `infra/monitoring/`
-- [ ] T080 [P] Validate Quickstart.md all three scenarios end-to-end on Docker Compose dev stack and document results
+- [x] T072 [P] Run WCAG 2.1 AA automated accessibility audit on all critical screens (insulin log, symptom record, alert detail, emergency protocol) and fix violations in `apps/mobile/src/features/`
+- [x] T073 [P] Add accessibility manual validation checklist: touch targets ≥ 44px, minimum 16sp critical text, screen reader labels in `specs/001-sweetcare-fullstack-foundation/checklists/accessibility.md`
+- [x] T074 [P] Implement API versioning middleware with `Accept-Version` header support in `apps/api/src/infrastructure/http/versioning.plugin.ts`
+- [x] T075 [P] Implement request correlation ID propagation (Fastify → AI service → logs) in `apps/api/src/infrastructure/http/correlation.plugin.ts`
+- [x] T076 Performance benchmark: validate p95 ≤ 300ms on POST /v1/insulin-records, POST /v1/symptoms, GET /v1/patients/{id}/timeline per quickstart.md criteria; document results in `specs/001-sweetcare-fullstack-foundation/performance-baseline.md`
+- [x] T077 [P] Security hardening: verify all OWASP controls (rate limiting, CORS, HSTS, CSP, input validation, SQL injection guard via Prisma) in `apps/api/src/`
+- [x] T078 [P] Implement data retention policy: audit log retention config and LGPD right-to-erasure endpoint skeleton in `apps/api/src/presentation/routes/data-rights.routes.ts`
+- [x] T079 [P] Setup Prometheus metrics export (`/metrics`) and Grafana dashboard config in `infra/monitoring/`
+- [x] T080 [P] Validate Quickstart.md all three scenarios end-to-end on Docker Compose dev stack and document results
 
 **Checkpoint**: All quickstart scenarios pass. Performance targets met. Accessibility audit clean. Security headers verified.
 

@@ -206,14 +206,57 @@ sweetcare-app/
 │   │
 │   ├── mobile/                        ← Expo SDK 52 + React Native 0.76
 │   │   ├── app.json                   ← Bundle IDs, plugins: expo-router, expo-secure-store, expo-sqlite
+│   │   ├── global.css                 ← CSS custom properties (design tokens para web/doc reference)
 │   │   ├── app/
-│   │   │   ├── _layout.tsx            ← QueryClient + Stack (emergency = fullScreenModal)
-│   │   │   └── (tabs)/
-│   │   │       ├── _layout.tsx        ← Tab nav com touch targets ≥ 56pt (acessibilidade)
-│   │   │       └── index.tsx          ← Tela inicial (stub — US1 implementa timeline)
+│   │   │   ├── _layout.tsx            ← QueryClient + ThemeProvider + AuthProvider + AuthGate + Stack
+│   │   │   ├── emergency.tsx          ← Protocolo de emergência fullscreen (offline, 5 protocolos, SAMU/Bombeiros)
+│   │   │   ├── auth/
+│   │   │   │   ├── _layout.tsx        ← Stack auth com animação fade
+│   │   │   │   ├── login.tsx          ← Email + senha, error banner, link para registro
+│   │   │   │   └── register.tsx       ← Nome + email + senha + confirmação, link para login
+│   │   │   ├── (tabs)/
+│   │   │   │   ├── _layout.tsx        ← Tab nav: Início / Registrar / Insights / Perfil
+│   │   │   │   ├── index.tsx          ← Timeline: FlatList de DoseCard/SymptomCard/AlertCard por data
+│   │   │   │   ├── log.tsx            ← Segmented control Insulina/Sintoma → InsulinLogScreen / SymptomRecordScreen
+│   │   │   │   ├── insights.tsx       ← Wrapper InsightsDashboardScreen com activePatient
+│   │   │   │   └── settings.tsx       ← Perfil, paciente ativo, LGPD export/delete, logout
+│   │   │   ├── patients/
+│   │   │   │   └── new.tsx            ← Modal criação PatientProfile (nome, DOB, diagnóstico, alvos, insulinas)
+│   │   │   └── alerts/
+│   │   │       └── [alertId].tsx      ← Modal alerta: guidance steps, contatos emergência, resolver
 │   │   └── src/
 │   │       ├── design/
-│   │       │   └── DESIGN_SYSTEM.md   ← Paleta, tipografia, espaçamento, componentes, acessibilidade
+│   │       │   ├── DESIGN_SYSTEM.md   ← Paleta, tipografia, espaçamento, componentes, acessibilidade
+│   │       │   ├── themes/
+│   │       │   │   ├── colors.ts      ← palette + semantic tokens (glucose, severity, sync, feedback)
+│   │       │   │   ├── typography.ts  ← fontSizes, weights, textVariants (display → caption)
+│   │       │   │   ├── spacing.ts     ← 4pt grid, touchTargets (min:44), radii, borderWidths
+│   │       │   │   ├── shadows.ts     ← none/sm/md/lg/xl/emergency/success presets
+│   │       │   │   ├── motion.ts      ← duration, easing, transitions, reducedMotionFallback
+│   │       │   │   ├── layout.ts      ← sizes (tabBar, header, input, button, icon), grid, SCREEN_WIDTH/HEIGHT
+│   │       │   │   └── tokens.ts      ← barrel re-export de todos os tokens
+│   │       │   ├── contexts/
+│   │       │   │   └── ThemeContext.tsx ← ThemeProvider + useTheme() (acesso a todos os tokens)
+│   │       │   ├── utils/
+│   │       │   │   └── haptics.ts     ← haptics.light/medium/heavy/success/warning/error/emergency()
+│   │       │   └── components/
+│   │       │       ├── ui/
+│   │       │       │   ├── Text.tsx       ← variant prop (h1-h4, body, caption, numeric, unit, button)
+│   │       │       │   ├── Icon.tsx       ← Feather/MaterialIcons/MaterialCommunityIcons wrapper
+│   │       │       │   ├── Badge.tsx      ← variants: default/primary/success/warning/error/severity/sync
+│   │       │       │   ├── Button.tsx     ← variants: primary/secondary/ghost/danger/emergency
+│   │       │       │   ├── Input.tsx      ← label/hint/error, secureToggle, leftElement/rightElement
+│   │       │       │   ├── Card.tsx       ← variants: default/elevated/outlined/severity; onPress → Touchable
+│   │       │       │   ├── Divider.tsx    ← horizontal/vertical, label opcional
+│   │       │       │   ├── Skeleton.tsx   ← shimmer animado (Animated.loop + sequence)
+│   │       │       │   └── EmptyState.tsx ← variants: default/offline/noRecords/noPatient/loadError
+│   │       │       ├── domain/
+│   │       │       │   ├── DoseCard.tsx        ← InsulinApplicationRecord: tipo, dose, rationale, glicemia, sync
+│   │       │       │   ├── GlucoseIndicator.tsx ← circle/inline/banner; glucose state → color tokens; staleness
+│   │       │       │   └── SymptomChecker.tsx  ← grid chips SymptomCode, emergency highlight, SeverityLevel
+│   │       │       └── layout/
+│   │       │           ├── Screen.tsx     ← SafeAreaView wrapper, scroll, offline banner, loading, error
+│   │       │           └── Header.tsx     ← left/right actions, sync badge, offline indicator, emergency mode
 │   │       ├── features/
 │   │       │   ├── insulin/screens/
 │   │       │   │   └── InsulinLogScreen.tsx      ← react-hook-form + Zod, offline fallback
@@ -225,6 +268,10 @@ sweetcare-app/
 │   │       │       ├── InsightsDashboardScreen.tsx ← lista relatórios, solicita novo, polling status, disclaimer-first
 │   │       │       └── ReportDetailScreen.tsx      ← disclaimer + summary + findings + confidence indicators
 │   │       └── infrastructure/
+│   │           ├── api/
+│   │           │   └── client.ts          ← apiClient (get/post/patch/delete), ApiError, token refresh automático
+│   │           ├── auth/
+│   │           │   └── AuthContext.tsx    ← AuthProvider + useAuth() (login, register, logout, setActivePatient)
 │   │           ├── storage/
 │   │           │   ├── secure-storage.ts  ← Tokens: iOS Keychain / Android Keystore (nunca AsyncStorage)
 │   │           │   └── offline-db.ts      ← SQLite: insulin + symptom offline + sync_queue
@@ -950,4 +997,22 @@ Impacto: `specs/.../performance-baseline.md`; tabela de resultados esperados com
 
 ---
 
-_Última atualização: 2026-05-28 — Phase 6 Polish completo (T072–T080) — 80/80 tarefas_
+### 2026-05-28 — Mobile completo (auth + navegação + todas as telas)
+
+**Decisão: Design system 100% custom (StyleSheet + useTheme) — sem NativeWind ou Tamagui**
+Motivação: NativeWind (Tailwind para RN) requer babel plugin e tem limitações com animações nativas. Tamagui adiciona ~3MB ao bundle e otimização de compilação experimental. StyleSheet.create com tokens via useTheme() é zero-dependência, type-safe, e integra perfeitamente com o sistema de temas existente.
+Impacto: `src/design/themes/` (colors, typography, spacing, shadows, motion, layout); `ThemeContext.tsx`; todos os componentes consomem apenas tokens do tema, sem valores literais inline.
+
+**Decisão: AuthGate em \_layout.tsx com useSegments + SplashScreen.hideAsync()**
+Motivação: O padrão recomendado pelo Expo Router para auth guard usa useSegments para detectar a rota atual sem navegar desnecessariamente. SplashScreen fica visível até que `isLoading` resolva, evitando flash de conteúdo não autenticado.
+Impacto: `app/_layout.tsx`; AuthGate renderiza null durante isLoading; redireciona automaticamente entre auth/ e (tabs)/.
+
+**Decisão: Protocolo de emergência hardcoded (sem API call)**
+Motivação: Em uma emergência médica (perda de consciência, cetoacidose), o dispositivo pode estar offline ou a API pode estar indisponível. Os protocolos são informações clínicas estáticas que devem funcionar offline.
+Impacto: `app/emergency.tsx` copia os protocolos de `alert-event.entity.ts` como constantes locais; sem dependência de rede; funciona com `gestureEnabled: false` (fullScreenModal, usuário não pode fechar acidentalmente).
+
+**Decisão: Validação inline sem biblioteca externa em patients/new.tsx**
+Motivação: O schema `createPatientSchema` do Zod já existe em `@sweetcare/shared-validation`, mas react-hook-form + zod no modal de criação de paciente adicionaria overhead de bundle para um formulário simples. Validação inline com função `validate()` cobre todos os campos sem nova dependência.
+Impacto: `app/patients/new.tsx`; padrão distinto do InsulinLogScreen (que usa react-hook-form) pois o formulário de paciente é usado apenas uma vez no onboarding.
+
+_Última atualização: 2026-05-28 — Mobile completo (auth, navegação, 8 novas telas) — 80/80 tarefas_
