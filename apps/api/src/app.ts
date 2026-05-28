@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
+    bodyLimit: 1_048_576,
     logger: {
       level: process.env["LOG_LEVEL"] ?? "info",
       redact: {
@@ -81,10 +82,10 @@ export async function buildApp(): Promise<FastifyInstance> {
     app.log.error({ err: error, correlationId }, "Unhandled application error");
 
     const statusCode = error.statusCode ?? 500;
+    const isServerError = statusCode >= 500;
     return reply.status(statusCode).send({
-      error: statusCode >= 500 ? "INTERNAL_ERROR" : (error.message ?? "REQUEST_ERROR"),
-      message:
-        statusCode >= 500 ? "An unexpected error occurred" : (error.message ?? "Bad request"),
+      error: isServerError ? "INTERNAL_ERROR" : (error.code ?? "REQUEST_ERROR"),
+      message: isServerError ? "An unexpected error occurred" : "Request failed",
       correlationId,
     });
   });

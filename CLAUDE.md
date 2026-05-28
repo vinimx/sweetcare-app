@@ -426,22 +426,22 @@ User            ──< UserSession   (família de tokens / family invalidation)
 
 #### Camadas de proteção
 
-| Camada             | Controle                                                       | Arquivo                    |
-| ------------------ | -------------------------------------------------------------- | -------------------------- |
-| Transporte         | TLS 1.3 mínimo (nginx/Caddy reverse proxy)                     | `infra/docker/`            |
-| HTTP               | HSTS 2 anos + CSP + X-Frame-Options                            | `security-plugins.ts`      |
-| Autenticação       | JWT HS256 15min + refresh 7d com family invalidation           | `jwt.plugin.ts`            |
-| Senha              | argon2id — 64MB, 3 iterações, parallelism=1                    | `password.service.ts`      |
-| Sessão             | Detecção de roubo por reutilização de token rotacionado        | `session.repository.ts`    |
-| Autorização        | RBAC (4 papéis) + verificação de `CaregiverAssignment`         | `rbac.middleware.ts`       |
-| Banco (app layer)  | AES-256-GCM por campo PHI via Prisma `$extends`                | `encryption-middleware.ts` |
-| Banco (DB layer)   | Row Level Security — `has_patient_access()` por sessão         | `rls-policies.sql`         |
-| Imutabilidade      | Triggers `BEFORE UPDATE OR DELETE` em tabelas médicas          | `rls-policies.sql`         |
-| Logging            | Pino — 15 paths PHI redatados, correlação por UUID             | `logger.ts`                |
-| Auditoria          | Append-only `audit_entries` — sem UPDATE/DELETE                | `audit.service.ts`         |
-| Mobile             | `expo-secure-store` (Keychain/Keystore) — nunca `AsyncStorage` | `secure-storage.ts`        |
-| Mobile offline     | SQLite com SQLCipher — criptografia de dispositivo             | `offline-db.ts`            |
-| Push notifications | Payload sem PHI — app busca conteúdo via API após receber      | `contracts/api-alerts.md`  |
+| Camada             | Controle                                                                       | Arquivo                         |
+| ------------------ | ------------------------------------------------------------------------------ | ------------------------------- |
+| Transporte         | TLS 1.3 mínimo (nginx/Caddy reverse proxy)                                     | `infra/docker/`                 |
+| HTTP               | HSTS 2 anos + CSP completo (frameAncestors, formAction, etc.) + bodyLimit 1 MB | `security-plugins.ts`, `app.ts` |
+| Autenticação       | JWT HS256 15min + refresh 7d com family invalidation                           | `jwt.plugin.ts`                 |
+| Senha              | argon2id — 64MB, 3 iterações, parallelism=1                                    | `password.service.ts`           |
+| Sessão             | Detecção de roubo por reutilização de token rotacionado                        | `session.repository.ts`         |
+| Autorização        | RBAC (4 papéis) + verificação de `CaregiverAssignment`                         | `rbac.middleware.ts`            |
+| Banco (app layer)  | AES-256-GCM por campo PHI via Prisma `$extends`                                | `encryption-middleware.ts`      |
+| Banco (DB layer)   | Row Level Security — `has_patient_access()` por sessão                         | `rls-policies.sql`              |
+| Imutabilidade      | Triggers `BEFORE UPDATE OR DELETE` em tabelas médicas                          | `rls-policies.sql`              |
+| Logging            | Pino — 15 paths PHI redatados, correlação por UUID                             | `logger.ts`                     |
+| Auditoria          | Append-only `audit_entries` — sem UPDATE/DELETE                                | `audit.service.ts`              |
+| Mobile             | `expo-secure-store` (Keychain/Keystore) — nunca `AsyncStorage`                 | `secure-storage.ts`             |
+| Mobile offline     | SQLite com SQLCipher — criptografia de dispositivo                             | `offline-db.ts`                 |
+| Push notifications | Payload sem PHI — app busca conteúdo via API após receber                      | `contracts/api-alerts.md`       |
 
 #### Conformidade LGPD Art. 14
 
@@ -649,8 +649,8 @@ DATABASE_URL=postgresql://sweetcare:test@localhost:5432/sweetcare_test pnpm --fi
 | Phase 3 — US1 (offline records + sync) | 20      | 20         | 100% ✅ |
 | Phase 4 — US2 (alerts)                 | 10      | 10         | 100% ✅ |
 | Phase 5 — US3 (AI insights)            | 12      | 12         | 100% ✅ |
-| Phase 6 — Polish                       | 9       | 0          | 0% 🔲   |
-| **Total**                              | **80**  | **71**     | **89%** |
+| Phase 6 — Polish                       | 9       | 1          | 11% 🔄  |
+| **Total**                              | **80**  | **72**     | **90%** |
 
 > Rastreamento detalhado em `specs/001-sweetcare-fullstack-foundation/tasks.md`
 
@@ -662,7 +662,7 @@ DATABASE_URL=postgresql://sweetcare:test@localhost:5432/sweetcare_test pnpm --fi
 | T074 | Middleware de versionamento de API (`Accept-Version`)                       | P2         |
 | T075 | Propagação de correlation ID (Fastify → AI service → logs)                  | P2         |
 | T076 | Benchmark de performance: p95 ≤ 300ms nos endpoints críticos                | P2         |
-| T077 | Hardening de segurança: verificação OWASP Top 10                            | P1         |
+| T077 | ~~Hardening de segurança: verificação OWASP Top 10~~ ✅ Concluído           | P1         |
 | T078 | Endpoint de direitos LGPD: `GET /users/me/data-export` + `DELETE /users/me` | P1         |
 
 ---
@@ -834,7 +834,34 @@ Impacto: `analysis_service.py` — cada detector usa linguagem descritiva ("fora
 Motivação: `prisma db push` falha com P1000 (auth) quando executado do Windows host para container Docker Desktop — o Prisma Rust engine não consegue resolver `localhost` para o container. A geração de SQL e aplicação interna bypassa esse problema sem alterar a configuração de rede.
 Impacto: Schema aplicado manualmente uma vez; `prisma generate` regenera o client normalmente. Para novos developers, usar o mesmo padrão ou acessar via `docker exec`.
 
+### 2026-05-28 — T077 (Phase 6) Security Hardening — OWASP Top 10
+
+**Decisão: 404 para recursos inacessíveis em vez de 403 em `GET /alerts/:id` e `PATCH /alerts/:id/resolve`**
+Motivação: Retornar 403 quando um alert existe mas o user não tem acesso vaza a existência do alert para qualquer usuário autenticado (IDOR). O padrão correto é retornar 404 tanto para "não encontrado" quanto para "sem acesso", eliminando enumeração de IDs.
+Impacto: `alerts.routes.ts`; comportamento uniforme — cliente não consegue distinguir inexistência de acesso negado.
+
+**Decisão: `checkPatientAccess` inline em `POST /insights/reports` em vez de `requirePatientAccess` middleware**
+Motivação: `requirePatientAccess` lê `request.params.patientId` mas a rota passa `patient_id` no body → middleware sempre retornava 400, bloqueando todos os requests legítimos. A verificação inline com `checkPatientAccess(userId, body.patient_id)` resolve o mismatch sem criar novo middleware.
+Impacto: `insights.routes.ts`; rota agora funciona corretamente para usuários autorizados.
+
+**Decisão: Validação de cursor com try/catch + NaN check em `GET /patients/:id/timeline`**
+Motivação: `new Date(Buffer.from(cursor, 'base64url').toString())` sem validação propagava `Invalid Date` silenciosamente, causando comportamento imprevisível na paginação. Falha explícita com 400 é mais segura e debugável.
+Impacto: `timeline.routes.ts`; schema de `from`/`to` trocado para `z.string().datetime()` (estava `z.string()` simples).
+
+**Correções aplicadas (T077):**
+
+- SQL injection: `$executeRawUnsafe` → `$executeRaw` tagged template em `client.ts`
+- IDOR em alertas: fetch antes de checar acesso → acesso unificado retornando 404
+- Write-role check ausente: `PATCH /alerts/:id/resolve` agora bloqueia role `read_only` via `isReadOnly()`
+- `requirePatientAccess` quebrado em insights POST: removido do preHandler, substituído por check inline
+- Cursor e datas inválidos em timeline: validação com try/catch e `isNaN` check
+- Datas inválidas em insights: `isNaN` check antes de `validateReportPeriod`
+- `bodyLimit: 1_048_576` adicionado ao Fastify (proteção DoS via payload grande)
+- Error handler: `error.message` raw removido das respostas 4xx (prevenção de info disclosure)
+- Helmet CSP: adicionados `styleSrc`, `imgSrc`, `connectSrc`, `fontSrc`, `frameSrc`, `frameAncestors`, `formAction`
+- Rate limit: `/auth/register` e `/auth/login` com limite de 5 req/15min (anti brute-force)
+
 ---
 
-_Última atualização: 2026-05-28 — Phase 5 (US3) completa_
-_Próxima atualização obrigatória: ao iniciar Phase 6 (Polish) — T072 acessibilidade_
+_Última atualização: 2026-05-28 — T077 Security Hardening (Phase 6) completo_
+_Próxima atualização obrigatória: ao iniciar T072 acessibilidade ou T078 LGPD data rights_

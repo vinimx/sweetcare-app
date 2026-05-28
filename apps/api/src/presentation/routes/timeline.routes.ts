@@ -46,8 +46,8 @@ const symptomEventSchema = z.object({
 const timelineEventSchema = z.discriminatedUnion("type", [insulinEventSchema, symptomEventSchema]);
 
 const listQuerySchema = z.object({
-  from: z.string().optional(),
-  to: z.string().optional(),
+  from: z.string().datetime({ offset: true }).optional(),
+  to: z.string().datetime({ offset: true }).optional(),
   types: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   cursor: z.string().optional(),
@@ -83,9 +83,27 @@ export default async function timelineRoutes(app: FastifyInstance) {
       const includeInsulin = requestedTypes.has("insulin");
       const includeSymptom = requestedTypes.has("symptom");
 
-      const cursorDate = query.cursor
-        ? new Date(Buffer.from(query.cursor, "base64url").toString("utf8"))
-        : null;
+      let cursorDate: Date | null = null;
+      if (query.cursor) {
+        try {
+          const decoded = Buffer.from(query.cursor, "base64url").toString("utf8");
+          const parsed = new Date(decoded);
+          if (isNaN(parsed.getTime())) {
+            return await reply.status(400).send({
+              error: "INVALID_CURSOR",
+              message: "Cursor is malformed",
+              correlationId: request.id,
+            });
+          }
+          cursorDate = parsed;
+        } catch {
+          return await reply.status(400).send({
+            error: "INVALID_CURSOR",
+            message: "Cursor is not valid base64url",
+            correlationId: request.id,
+          });
+        }
+      }
 
       const baseQuery = {
         from: query.from ? new Date(query.from) : undefined,

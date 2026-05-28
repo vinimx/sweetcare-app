@@ -125,5 +125,5 @@ export async function disconnectPrisma(): Promise<void> {
 // Sets the current user ID for RLS policy evaluation.
 // Must be called at the start of every request that touches RLS-protected tables.
 export async function setCurrentUserId(prisma: PrismaClient, userId: string): Promise<void> {
-  await prisma.$executeRawUnsafe(`SET LOCAL app.current_user_id = '${userId}'`);
+  await prisma.$executeRaw`SET LOCAL app.current_user_id = ${userId}`;
 }

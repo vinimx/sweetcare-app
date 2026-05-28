@@ -3,6 +3,7 @@ import { z } from "zod";
 import { registerSchema, loginSchema, mfaVerifySchema } from "@sweetcare/shared-validation";
 import { register, login, refresh, logout } from "../../application/auth/auth.service.js";
 import { REFRESH_COOKIE, buildRefreshCookie } from "../../infrastructure/auth/jwt.plugin.js";
+import { RATE_LIMIT_AUTH_WINDOW_MS } from "@sweetcare/shared-config";
 
 const isProduction = process.env["NODE_ENV"] === "production";
 
@@ -11,6 +12,7 @@ export default async function authRoutes(app: FastifyInstance) {
   app.post(
     "/auth/register",
     {
+      config: { rateLimit: { max: 5, timeWindow: RATE_LIMIT_AUTH_WINDOW_MS } },
       schema: {
         body: registerSchema,
         response: {
@@ -46,6 +48,7 @@ export default async function authRoutes(app: FastifyInstance) {
   app.post(
     "/auth/login",
     {
+      config: { rateLimit: { max: 5, timeWindow: RATE_LIMIT_AUTH_WINDOW_MS } },
       schema: {
         body: loginSchema,
         response: {

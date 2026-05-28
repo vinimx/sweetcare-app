@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requirePatientAccess } from "../../infrastructure/auth/rbac.middleware.js";
-import { checkPatientAccess } from "../../domain/services/caregiver-access.guard.js";
+import { checkPatientAccess, isReadOnly } from "../../domain/services/caregiver-access.guard.js";
 import {
   getPatientAlerts,
   getAlertById,
@@ -110,7 +110,6 @@ export default async function alertsRoutes(app: FastifyInstance) {
         params: z.object({ alertId: z.string().uuid() }),
         response: {
           200: alertDetailSchema,
-          403: errorSchema,
           404: errorSchema,
         },
       },
@@ -119,19 +118,15 @@ export default async function alertsRoutes(app: FastifyInstance) {
       const { alertId } = request.params as { alertId: string };
 
       const alert = await getAlertById(alertId);
-      if (!alert) {
+      // Return 404 for both "not found" and "no access" to prevent alert ID enumeration.
+      const access = alert
+        ? await checkPatientAccess(request.jwtUser.sub, alert.patientProfileId)
+        : null;
+
+      if (!alert || !access) {
         return reply.status(404).send({
           error: "ALERT_NOT_FOUND",
           message: "Alert not found",
-          correlationId: request.id,
-        });
-      }
-
-      const access = await checkPatientAccess(request.jwtUser.sub, alert.patientProfileId);
-      if (!access) {
-        return reply.status(403).send({
-          error: "FORBIDDEN",
-          message: "No active caregiver assignment for this patient",
           correlationId: request.id,
         });
       }
@@ -178,7 +173,12 @@ export default async function alertsRoutes(app: FastifyInstance) {
       const { alertId } = request.params as { alertId: string };
 
       const alert = await getAlertById(alertId);
-      if (!alert) {
+      // Return 404 for both "not found" and "no access" to prevent alert ID enumeration.
+      const access = alert
+        ? await checkPatientAccess(request.jwtUser.sub, alert.patientProfileId)
+        : null;
+
+      if (!alert || !access) {
         return reply.status(404).send({
           error: "ALERT_NOT_FOUND",
           message: "Alert not found",
@@ -186,11 +186,10 @@ export default async function alertsRoutes(app: FastifyInstance) {
         });
       }
 
-      const access = await checkPatientAccess(request.jwtUser.sub, alert.patientProfileId);
-      if (!access) {
+      if (isReadOnly(access.assignmentRole)) {
         return reply.status(403).send({
-          error: "FORBIDDEN",
-          message: "No active caregiver assignment for this patient",
+          error: "READ_ONLY_ASSIGNMENT",
+          message: "Your caregiver role is read-only for this patient",
           correlationId: request.id,
         });
       }

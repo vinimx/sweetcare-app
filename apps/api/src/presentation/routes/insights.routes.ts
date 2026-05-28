@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { requirePatientAccess } from "../../infrastructure/auth/rbac.middleware.js";
-import { checkPatientAccess } from "../../domain/services/caregiver-access.guard.js";
-import { hasActiveConsent } from "../../domain/services/caregiver-access.guard.js";
+import {
+  checkPatientAccess,
+  hasActiveConsent,
+} from "../../domain/services/caregiver-access.guard.js";
 import {
   validateReportPeriod,
   CLINICAL_DISCLAIMER_V1,
@@ -48,7 +49,7 @@ export default async function insightsRoutes(app: FastifyInstance) {
   app.post(
     "/insights/reports",
     {
-      preHandler: [app.authenticate, requirePatientAccess],
+      preHandler: [app.authenticate],
       schema: {
         body: z.object({
           patient_id: z.string().uuid(),
@@ -76,8 +77,26 @@ export default async function insightsRoutes(app: FastifyInstance) {
         period_end: string;
       };
 
+      // Verify caregiver assignment before any processing
+      const patientAccess = await checkPatientAccess(request.jwtUser.sub, body.patient_id);
+      if (!patientAccess) {
+        return reply.status(403).send({
+          error: "PATIENT_ACCESS_DENIED",
+          message: "No active caregiver assignment for this patient",
+          correlationId: request.id,
+        });
+      }
+
       const periodStart = new Date(body.period_start);
       const periodEnd = new Date(body.period_end);
+
+      if (isNaN(periodStart.getTime()) || isNaN(periodEnd.getTime())) {
+        return reply.status(422).send({
+          error: "INVALID_DATE",
+          message: "period_start and period_end must be valid calendar dates",
+          correlationId: request.id,
+        });
+      }
 
       const periodError = validateReportPeriod(periodStart, periodEnd);
       if (periodError) {
