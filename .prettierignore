@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.expo
+coverage
+pnpm-lock.yaml
+*.min.js
+android
+ios
+.turbo

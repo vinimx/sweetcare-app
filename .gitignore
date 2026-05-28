@@ -1,0 +1,62 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build outputs
+dist
+build
+.expo
+.turbo
+
+# Environment — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+logs
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage
+.nyc_output
+
+# Python
+__pycache__
+*.pyc
+.venv
+venv
+*.egg-info
+.pytest_cache
+
+# Claude Code — local-only project settings (personal overrides, not team config)
+.claude/settings.local.json
+
+# IDE
+.vscode/launch.json
+.idea
+*.suo
+*.user
+
+# Mobile
+android/app/build
+ios/build
+ios/Pods
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+*.orig.*
+web-build
+
+# Database
+*.sqlite
+*.db

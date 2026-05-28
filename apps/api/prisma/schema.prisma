@@ -1,0 +1,377 @@
+// SweetCare API — Prisma Schema
+// PHI fields are encrypted at the application layer via encryption-middleware.ts
+// Never query PHI field values in raw SQL or logs
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────
+
+enum UserRole {
+  guardian
+  caregiver
+  healthcare_professional
+  admin
+}
+
+enum AssignmentRole {
+  primary_guardian
+  secondary_guardian
+  caregiver
+  read_only
+}
+
+enum ConsentType {
+  data_processing
+  ai_analysis
+  data_sharing
+}
+
+enum InsulinDoseRationale {
+  correction
+  meal_coverage
+  basal
+  combination
+}
+
+enum SyncStatus {
+  pending
+  synced
+  conflict
+}
+
+enum SeverityLevel {
+  mild
+  moderate
+  severe
+  emergency
+}
+
+enum AlertType {
+  hypoglycemia_risk
+  severe_hypoglycemia
+  ketoacidosis_risk
+  emergency_response_required
+}
+
+enum AlertSeverity {
+  warning
+  critical
+  emergency
+}
+
+enum SyncEventStatus {
+  initiated
+  completed
+  partial_failure
+  failed
+}
+
+enum SyncType {
+  full
+  partial
+  conflict_resolution
+}
+
+enum ReportType {
+  weekly_summary
+  glucose_pattern
+  insulin_effectiveness
+  symptom_trend
+}
+
+enum ReportStatus {
+  processing
+  completed
+  failed
+}
+
+enum AuditOperation {
+  create
+  update
+  delete
+  sync_commit
+  alert_generated
+  consent_granted
+  consent_revoked
+}
+
+enum RevocationReason {
+  logout
+  rotation_theft_detected
+  admin_revoke
+  password_change
+}
+
+// ─────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────
+
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String   @unique // [SENSITIVE] hashed in logs
+  passwordHash String   @map("password_hash") // [SENSITIVE] argon2id, never logged
+  role         UserRole
+  displayName  String   @map("display_name") // [PHI-ENCRYPTED]
+  phoneE164    String?  @map("phone_e164") // [PHI-ENCRYPTED]
+  isActive     Boolean  @default(true) @map("is_active")
+  mfaEnabled   Boolean  @default(false) @map("mfa_enabled")
+  mfaSecretEnc String?  @map("mfa_secret_enc") // [PHI-ENCRYPTED]
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  consentRecordsGranted ConsentRecord[]       @relation("GrantedBy")
+  patientProfilesCreated PatientProfile[]     @relation("CreatedBy")
+  caregiverAssignments  CaregiverAssignment[] @relation("AssignedUser")
+  assignmentsGranted    CaregiverAssignment[] @relation("GrantedBy")
+  insulinRecords        InsulinApplicationRecord[]
+  symptomRecords        SymptomRecord[]
+  alertsResolved        AlertEvent[]          @relation("ResolvedBy")
+  syncEvents            SyncEvent[]
+  auditEntries          AuditEntry[]
+  insightReports        InsightReport[]
+  sessions              UserSession[]
+
+  @@index([role, isActive])
+  @@map("users")
+}
+
+model ConsentRecord {
+  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guardianUserId      String      @map("guardian_user_id") @db.Uuid
+  patientProfileId    String      @map("patient_profile_id") @db.Uuid
+  consentType         ConsentType @map("consent_type")
+  grantedAt           DateTime    @map("granted_at") @db.Timestamptz
+  revokedAt           DateTime?   @map("revoked_at") @db.Timestamptz
+  consentTextVersion  String      @map("consent_text_version")
+  ipAddressHash       String      @map("ip_address_hash")
+  userAgentHash       String      @map("user_agent_hash")
+
+  guardian       User           @relation("GrantedBy", fields: [guardianUserId], references: [id])
+  patientProfile PatientProfile @relation(fields: [patientProfileId], references: [id])
+
+  @@index([guardianUserId, consentType])
+  @@index([patientProfileId, consentType, revokedAt])
+  @@map("consent_records")
+}
+
+model PatientProfile {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fullName              String   @map("full_name") // [PHI-ENCRYPTED]
+  dateOfBirth           DateTime @map("date_of_birth") @db.Date // [PHI-ENCRYPTED] stored as encrypted string
+  diagnosisYear         Int      @map("diagnosis_year") @db.SmallInt
+  targetGlucoseMinMgdl  Int      @map("target_glucose_min_mgdl")
+  targetGlucoseMaxMgdl  Int      @map("target_glucose_max_mgdl")
+  insulinTypeBasal      String?  @map("insulin_type_basal") // [PHI-ENCRYPTED]
+  insulinTypeBolus      String?  @map("insulin_type_bolus") // [PHI-ENCRYPTED]
+  icrUnitsPerGramCarb   Decimal? @map("icr_units_per_gram_carb") @db.Decimal(5, 2)
+  isfMgdlPerUnit        Decimal? @map("isf_mgdl_per_unit") @db.Decimal(6, 2)
+  createdByUserId       String   @map("created_by_user_id") @db.Uuid
+  isActive              Boolean  @default(true) @map("is_active")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  createdBy          User                      @relation("CreatedBy", fields: [createdByUserId], references: [id])
+  caregiverAssignments CaregiverAssignment[]
+  insulinRecords     InsulinApplicationRecord[]
+  symptomRecords     SymptomRecord[]
+  alertEvents        AlertEvent[]
+  syncEvents         SyncEvent[]
+  insightReports     InsightReport[]
+  consentRecords     ConsentRecord[]
+
+  @@index([createdByUserId])
+  @@index([isActive])
+  @@map("patient_profiles")
+}
+
+model CaregiverAssignment {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientProfileId String         @map("patient_profile_id") @db.Uuid
+  userId           String         @map("user_id") @db.Uuid
+  assignmentRole   AssignmentRole @map("assignment_role")
+  grantedByUserId  String         @map("granted_by_user_id") @db.Uuid
+  grantedAt        DateTime       @map("granted_at") @db.Timestamptz
+  revokedAt        DateTime?      @map("revoked_at") @db.Timestamptz
+
+  patientProfile PatientProfile @relation(fields: [patientProfileId], references: [id])
+  user           User           @relation("AssignedUser", fields: [userId], references: [id])
+  grantedBy      User           @relation("GrantedBy", fields: [grantedByUserId], references: [id])
+
+  @@unique([patientProfileId, userId])
+  @@index([userId, revokedAt])
+  @@map("caregiver_assignments")
+}
+
+model InsulinApplicationRecord {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId            String               @unique @map("client_id") @db.Uuid
+  patientProfileId    String               @map("patient_profile_id") @db.Uuid
+  recordedByUserId    String               @map("recorded_by_user_id") @db.Uuid
+  insulinType         String               @map("insulin_type") // [PHI-ENCRYPTED]
+  doseUnits           Decimal              @map("dose_units") @db.Decimal(5, 2)
+  doseRationale       InsulinDoseRationale @map("dose_rationale")
+  mealCarbsGrams      Int?                 @map("meal_carbs_grams")
+  glucoseBeforeMgdl   Int?                 @map("glucose_before_mgdl") // [PHI-ENCRYPTED]
+  administrationSite  String?              @map("administration_site")
+  notes               String?              // [PHI-ENCRYPTED]
+  appliedAt           DateTime             @map("applied_at") @db.Timestamptz
+  recordedAt          DateTime             @default(now()) @map("recorded_at") @db.Timestamptz
+  syncStatus          SyncStatus           @default(synced) @map("sync_status")
+  timezone            String
+
+  patientProfile PatientProfile @relation(fields: [patientProfileId], references: [id])
+  recordedBy     User           @relation(fields: [recordedByUserId], references: [id])
+  auditEntries   AuditEntry[]
+
+  @@index([patientProfileId, appliedAt(sort: Desc)])
+  @@index([syncStatus])
+  @@map("insulin_application_records")
+}
+
+model SymptomRecord {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId            String        @unique @map("client_id") @db.Uuid
+  patientProfileId    String        @map("patient_profile_id") @db.Uuid
+  recordedByUserId    String        @map("recorded_by_user_id") @db.Uuid
+  symptomCodes        String[]      @map("symptom_codes")
+  severityLevel       SeverityLevel @map("severity_level")
+  glucoseReadingMgdl  Int?          @map("glucose_reading_mgdl") // [PHI-ENCRYPTED]
+  notes               String?       // [PHI-ENCRYPTED]
+  observedAt          DateTime      @map("observed_at") @db.Timestamptz
+  recordedAt          DateTime      @default(now()) @map("recorded_at") @db.Timestamptz
+  syncStatus          SyncStatus    @default(synced) @map("sync_status")
+  timezone            String
+
+  patientProfile PatientProfile @relation(fields: [patientProfileId], references: [id])
+  recordedBy     User           @relation(fields: [recordedByUserId], references: [id])
+  alertEvents    AlertEvent[]
+  auditEntries   AuditEntry[]
+
+  @@index([patientProfileId, observedAt(sort: Desc)])
+  @@index([severityLevel])
+  @@index([syncStatus])
+  @@map("symptom_records")
+}
+
+model AlertEvent {
+  id                      String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientProfileId        String        @map("patient_profile_id") @db.Uuid
+  triggerSymptomRecordId  String        @map("trigger_symptom_record_id") @db.Uuid
+  alertType               AlertType     @map("alert_type")
+  severityLevel           AlertSeverity @map("severity_level")
+  guidanceKey             String        @map("guidance_key")
+  notifiedUserIds         String[]      @map("notified_user_ids") @db.Uuid
+  createdAt               DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  resolvedAt              DateTime?     @map("resolved_at") @db.Timestamptz
+  resolvedByUserId        String?       @map("resolved_by_user_id") @db.Uuid
+
+  patientProfile       PatientProfile @relation(fields: [patientProfileId], references: [id])
+  triggerSymptomRecord SymptomRecord  @relation(fields: [triggerSymptomRecordId], references: [id])
+  resolvedBy           User?          @relation("ResolvedBy", fields: [resolvedByUserId], references: [id])
+  auditEntries         AuditEntry[]
+
+  @@index([patientProfileId, createdAt(sort: Desc)])
+  @@index([alertType, resolvedAt])
+  @@map("alert_events")
+}
+
+model SyncEvent {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientProfileId    String          @map("patient_profile_id") @db.Uuid
+  initiatedByUserId   String          @map("initiated_by_user_id") @db.Uuid
+  syncType            SyncType        @map("sync_type")
+  recordsSubmitted    Int             @map("records_submitted")
+  recordsCommitted    Int             @map("records_committed")
+  recordsConflicted   Int             @map("records_conflicted")
+  conflictDetails     Json?           @map("conflict_details") @db.JsonB // [PHI-ENCRYPTED] at app layer
+  status              SyncEventStatus
+  startedAt           DateTime        @default(now()) @map("started_at") @db.Timestamptz
+  completedAt         DateTime?       @map("completed_at") @db.Timestamptz
+  errorCode           String?         @map("error_code")
+
+  patientProfile PatientProfile @relation(fields: [patientProfileId], references: [id])
+  initiatedBy    User           @relation(fields: [initiatedByUserId], references: [id])
+
+  @@index([patientProfileId, startedAt(sort: Desc)])
+  @@index([status])
+  @@map("sync_events")
+}
+
+model AuditEntry {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorUserId     String         @map("actor_user_id") @db.Uuid
+  correlationId   String         @map("correlation_id") @db.Uuid
+  operation       AuditOperation
+  targetTable     String         @map("target_table")
+  targetId        String         @map("target_id") @db.Uuid
+  diffSummary     Json?          @map("diff_summary") @db.JsonB // field names only — no PHI values
+  ipAddressHash   String         @map("ip_address_hash")
+  userAgentHash   String         @map("user_agent_hash")
+  occurredAt      DateTime       @default(now()) @map("occurred_at") @db.Timestamptz
+
+  actorUser              User                      @relation(fields: [actorUserId], references: [id])
+  insulinRecord          InsulinApplicationRecord? @relation(fields: [targetId], references: [id], map: "audit_insulin_fk")
+  symptomRecord          SymptomRecord?            @relation(fields: [targetId], references: [id], map: "audit_symptom_fk")
+  alertEvent             AlertEvent?               @relation(fields: [targetId], references: [id], map: "audit_alert_fk")
+
+  @@index([targetTable, targetId])
+  @@index([actorUserId, occurredAt(sort: Desc)])
+  @@index([correlationId])
+  @@map("audit_entries")
+}
+
+model InsightReport {
+  id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientProfileId    String       @map("patient_profile_id") @db.Uuid
+  requestedByUserId   String       @map("requested_by_user_id") @db.Uuid
+  reportType          ReportType   @map("report_type")
+  periodStart         DateTime     @map("period_start") @db.Date
+  periodEnd           DateTime     @map("period_end") @db.Date
+  status              ReportStatus @default(processing) @map("status")
+  aiModelVersion      String       @default("") @map("ai_model_version")
+  summaryText         String?      @map("summary_text") // [PHI-ENCRYPTED]
+  patternFindings     Json?        @map("pattern_findings") @db.JsonB
+  confidenceContext   Json?        @map("confidence_context") @db.JsonB
+  disclaimerKey       String       @default("CLINICAL_DISCLAIMER_V1") @map("disclaimer_key")
+  errorCode           String?      @map("error_code")
+  generatedAt         DateTime     @default(now()) @map("generated_at") @db.Timestamptz
+  isInvalidated       Boolean      @default(false) @map("is_invalidated")
+
+  patientProfile PatientProfile @relation(fields: [patientProfileId], references: [id])
+  requestedBy    User           @relation(fields: [requestedByUserId], references: [id])
+
+  @@index([patientProfileId, generatedAt(sort: Desc)])
+  @@index([reportType, periodStart])
+  @@index([status])
+  @@map("insight_reports")
+}
+
+model UserSession {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String            @map("user_id") @db.Uuid
+  familyId          String            @map("family_id") @db.Uuid
+  tokenHash         String            @unique @map("token_hash") // SHA-256 of refresh token
+  parentTokenHash   String?           @map("parent_token_hash")
+  deviceFingerprint String?           @map("device_fingerprint")
+  issuedAt          DateTime          @default(now()) @map("issued_at") @db.Timestamptz
+  expiresAt         DateTime          @map("expires_at") @db.Timestamptz
+  revokedAt         DateTime?         @map("revoked_at") @db.Timestamptz
+  revocationReason  RevocationReason? @map("revocation_reason")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, expiresAt])
+  @@index([familyId])
+  @@map("user_sessions")
+}

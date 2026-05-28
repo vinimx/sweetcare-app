@@ -1,0 +1,14 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@sweetcare/shared-types": ["../../packages/shared-types/src/index.ts"],
+      "@sweetcare/shared-validation": ["../../packages/shared-validation/src/index.ts"],
+      "@sweetcare/shared-config": ["../../packages/shared-config/src/index.ts"],
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.d.ts", "expo-env.d.ts"]
+}

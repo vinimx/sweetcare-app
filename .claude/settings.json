@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const chunks=[]; process.stdin.on('data',c=>chunks.push(c)); process.stdin.on('end',()=>{ const d=JSON.parse(chunks.join('')); const f=(d.tool_input&&d.tool_input.file_path)||''; if(/\\.(ts|tsx|py|sql|prisma)$/.test(f)){ process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:'PostToolUse',additionalContext:'CLAUDE.md reminder: modified '+f+' — update CLAUDE.md if this change adds/removes/modifies endpoints, models, security controls, env vars, or architecture.'}})); } });\" 2>/dev/null || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"D:/DEV/Portfolio/sweetcare-app\" && { git status --short 2>/dev/null | grep -qE \"\\.(ts|tsx|py|sql|prisma)$\" && echo '{\"systemMessage\": \"SweetCare: structural files changed this session — verify CLAUDE.md reflects current endpoints, schema, env vars, and architecture.\"}'; } 2>/dev/null || true",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "paths": {
+      "@sweetcare/shared-types": ["../../packages/shared-types/src/index.ts"],
+      "@sweetcare/shared-validation": ["../../packages/shared-validation/src/index.ts"],
+      "@sweetcare/shared-config": ["../../packages/shared-config/src/index.ts"],
+      "@prisma/client": ["./node_modules/.prisma/client/index.js"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["dist", "node_modules", "tests"]
+}
