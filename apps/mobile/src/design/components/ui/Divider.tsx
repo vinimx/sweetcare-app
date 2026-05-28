@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, type ViewStyle } from "react-native";
 import { Text } from "./Text.js";
 import { useTheme } from "../../contexts/ThemeContext.js";
 
@@ -9,6 +9,7 @@ interface DividerProps {
   thickness?: number;
   spacing?: number;
   label?: string;
+  style?: ViewStyle;
 }
 
 export function Divider({
@@ -17,6 +18,7 @@ export function Divider({
   thickness,
   spacing = 8,
   label,
+  style,
 }: DividerProps) {
   const { theme } = useTheme();
   const lineColor = color ?? theme.colors.border.DEFAULT;
@@ -24,7 +26,7 @@ export function Divider({
 
   if (label) {
     return (
-      <View style={[styles.labelRow, { marginVertical: spacing }]}>
+      <View style={[styles.labelRow, { marginVertical: spacing }, style]}>
         <View
           style={[styles.line, { backgroundColor: lineColor, height: lineThickness, flex: 1 }]}
         />
@@ -41,14 +43,20 @@ export function Divider({
   if (orientation === "vertical") {
     return (
       <View
-        style={[{ width: lineThickness, backgroundColor: lineColor, marginHorizontal: spacing }]}
+        style={[
+          { width: lineThickness, backgroundColor: lineColor, marginHorizontal: spacing },
+          style,
+        ]}
       />
     );
   }
 
   return (
     <View
-      style={[{ height: lineThickness, backgroundColor: lineColor, marginVertical: spacing }]}
+      style={[
+        { height: lineThickness, backgroundColor: lineColor, marginVertical: spacing },
+        style,
+      ]}
     />
   );
 }

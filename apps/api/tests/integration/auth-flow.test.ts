@@ -77,4 +77,32 @@ describe("Auth flow", () => {
     });
     expect(response.statusCode).toBe(401);
   });
+
+  it("GET /api/v1/users/me without auth returns 401", async () => {
+    const response = await app.inject({ method: "GET", url: "/api/v1/users/me" });
+    expect(response.statusCode).toBe(401);
+  });
+
+  it("POST /api/v1/auth/register rejects missing display_name with 422", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/register",
+      payload: {
+        email: "test@example.com",
+        password: "StrongPass#1234",
+        role: "guardian",
+        // display_name intentionally omitted
+      },
+    });
+    expect(response.statusCode).toBe(422);
+  });
+
+  it("POST /api/v1/auth/refresh with body refreshToken missing returns 401", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/refresh",
+      payload: {},
+    });
+    expect(response.statusCode).toBe(401);
+  });
 });

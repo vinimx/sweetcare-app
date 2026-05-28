@@ -4,11 +4,85 @@ import { registerSchema, loginSchema, mfaVerifySchema } from "@sweetcare/shared-
 import { register, login, refresh, logout } from "../../application/auth/auth.service.js";
 import { REFRESH_COOKIE, buildRefreshCookie } from "../../infrastructure/auth/jwt.plugin.js";
 import { RATE_LIMIT_AUTH_WINDOW_MS } from "@sweetcare/shared-config";
+import { getPrismaClient } from "../../infrastructure/database/client.js";
 
 const isProduction = process.env["NODE_ENV"] === "production";
 
+// Shared response schemas
+const userSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  role: z.string(),
+  displayName: z.string(),
+  isActive: z.boolean(),
+  mfaEnabled: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const authResponseSchema = z.object({
+  accessToken: z.string(),
+  tokenType: z.literal("Bearer"),
+  expiresIn: z.number(),
+  refreshToken: z.string(),
+  userId: z.string(),
+  role: z.string(),
+  user: userSchema,
+});
+
+const errorSchema = z.object({
+  error: z.string(),
+  message: z.string(),
+  correlationId: z.string().optional(),
+});
+
+async function fetchUserById(userId: string) {
+  const prisma = getPrismaClient();
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      displayName: true,
+      isActive: true,
+      mfaEnabled: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+  return {
+    id: user.id,
+    email: user.email,
+    role: user.role as string,
+    displayName: user.displayName,
+    isActive: user.isActive,
+    mfaEnabled: user.mfaEnabled,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
+  };
+}
+
 export default async function authRoutes(app: FastifyInstance) {
-  // POST /auth/register
+  // GET /users/me — returns authenticated user profile
+  app.get(
+    "/users/me",
+    {
+      preHandler: [app.authenticate],
+      schema: {
+        response: {
+          200: userSchema,
+          401: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const user = await fetchUserById(request.jwtUser.sub);
+      return reply.status(200).send(user);
+    },
+  );
+
+  // POST /auth/register — creates account and auto-logs in
   app.post(
     "/auth/register",
     {
@@ -16,30 +90,31 @@ export default async function authRoutes(app: FastifyInstance) {
       schema: {
         body: registerSchema,
         response: {
-          201: z.object({ user_id: z.string(), created_at: z.string() }),
-          409: z.object({
-            error: z.string(),
-            message: z.string(),
-            correlationId: z.string().optional(),
-          }),
-          422: z.object({
-            error: z.string(),
-            message: z.string(),
-            correlationId: z.string().optional(),
-          }),
-          429: z.object({
-            error: z.string(),
-            message: z.string(),
-            correlationId: z.string().optional(),
-          }),
+          201: authResponseSchema,
+          409: errorSchema,
+          422: errorSchema,
+          429: errorSchema,
         },
       },
     },
     async (request, reply) => {
-      const result = await register(request.body);
+      const body = request.body;
+      await register(body);
+
+      // Auto-login after registration
+      const result = await login(app, { email: body.email, password: body.password });
+      const user = await fetchUserById(result.userId);
+
+      reply.header("Set-Cookie", buildRefreshCookie(result.refreshToken, isProduction));
+
       return reply.status(201).send({
-        user_id: result.userId,
-        created_at: new Date().toISOString(),
+        accessToken: result.accessToken,
+        tokenType: "Bearer",
+        expiresIn: 900,
+        refreshToken: result.refreshToken,
+        userId: result.userId,
+        role: result.role as string,
+        user,
       });
     },
   );
@@ -52,51 +127,57 @@ export default async function authRoutes(app: FastifyInstance) {
       schema: {
         body: loginSchema,
         response: {
-          200: z.object({
-            access_token: z.string(),
-            token_type: z.literal("Bearer"),
-            expires_in: z.number(),
-            user_id: z.string(),
-            role: z.string(),
-          }),
+          200: authResponseSchema,
+          401: errorSchema,
+          403: errorSchema,
+          429: errorSchema,
         },
       },
     },
     async (request, reply) => {
       const result = await login(app, request.body, request.body.device_fingerprint);
+      const user = await fetchUserById(result.userId);
 
       reply.header("Set-Cookie", buildRefreshCookie(result.refreshToken, isProduction));
 
       return reply.status(200).send({
-        access_token: result.accessToken,
-        token_type: "Bearer",
-        expires_in: 900,
-        user_id: result.userId,
-        role: result.role,
+        accessToken: result.accessToken,
+        tokenType: "Bearer",
+        expiresIn: 900,
+        refreshToken: result.refreshToken,
+        userId: result.userId,
+        role: result.role as string,
+        user,
       });
     },
   );
 
-  // POST /auth/refresh — reads refresh token from HttpOnly cookie
+  // POST /auth/refresh — reads refresh token from HttpOnly cookie OR request body
+  // Note: no body schema — body is optional and read via type assertion to avoid
+  // Fastify rejecting requests with empty body before the handler runs
   app.post(
     "/auth/refresh",
     {
       schema: {
         response: {
           200: z.object({
-            access_token: z.string(),
-            token_type: z.literal("Bearer"),
-            expires_in: z.number(),
+            accessToken: z.string(),
+            tokenType: z.literal("Bearer"),
+            expiresIn: z.number(),
+            refreshToken: z.string(),
           }),
+          401: errorSchema,
         },
       },
     },
     async (request, reply) => {
-      const rawToken = request.cookies[REFRESH_COOKIE];
+      const body = request.body as { refreshToken?: string } | undefined;
+      const rawToken = request.cookies[REFRESH_COOKIE] ?? body?.refreshToken;
+
       if (!rawToken) {
         return reply.status(401).send({
           error: "REFRESH_TOKEN_INVALID",
-          message: "Refresh token cookie missing",
+          message: "Refresh token missing",
           correlationId: request.id,
         });
       }
@@ -106,19 +187,20 @@ export default async function authRoutes(app: FastifyInstance) {
       reply.header("Set-Cookie", buildRefreshCookie(result.refreshToken, isProduction));
 
       return reply.status(200).send({
-        access_token: result.accessToken,
-        token_type: "Bearer",
-        expires_in: 900,
+        accessToken: result.accessToken,
+        tokenType: "Bearer",
+        expiresIn: 900,
+        refreshToken: result.refreshToken,
       });
     },
   );
 
   // POST /auth/logout
   app.post("/auth/logout", { preHandler: [app.authenticate] }, async (request, reply) => {
-    const rawToken = request.cookies[REFRESH_COOKIE];
+    const body = request.body as { refreshToken?: string } | undefined;
+    const rawToken = request.cookies[REFRESH_COOKIE] ?? body?.refreshToken;
     if (rawToken) await logout(rawToken);
 
-    // Clear the cookie
     reply.header(
       "Set-Cookie",
       `${REFRESH_COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth/refresh; Max-Age=0`,

@@ -17,7 +17,7 @@ import { queueInsulinRecord } from "../../../infrastructure/sync/offline-queue.j
 type FormValues = z.infer<typeof createInsulinRecordSchema>;
 
 function zodResolver<T extends z.ZodType>(schema: T): Resolver<z.infer<T>> {
-  return (data) => {
+  return ((data: z.infer<T>) => {
     const result = schema.safeParse(data);
     if (result.success) return { values: result.data as z.infer<T>, errors: {} };
     const errors: Record<string, { message: string; type: string }> = {};
@@ -26,7 +26,7 @@ function zodResolver<T extends z.ZodType>(schema: T): Resolver<z.infer<T>> {
       if (key && !errors[key]) errors[key] = { message: issue.message, type: "validation" };
     }
     return { values: {} as z.infer<T>, errors };
-  };
+  }) as unknown as Resolver<z.infer<T>>;
 }
 
 const DOSE_RATIONALE_OPTIONS = [

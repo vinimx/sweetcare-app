@@ -179,7 +179,7 @@ export default function AlertDetailScreen() {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.background.DEFAULT }]}>
         <View style={styles.notFound}>
-          <Text variant="bodyMd" color={theme.colors.text.secondary}>
+          <Text variant="body" color={theme.colors.text.secondary}>
             Alerta não encontrado.
           </Text>
           <Button
@@ -261,7 +261,7 @@ export default function AlertDetailScreen() {
                   {i + 1}
                 </Text>
               </View>
-              <Text variant="bodyMd" style={styles.stepText}>
+              <Text variant="body" style={styles.stepText}>
                 {step}
               </Text>
             </View>

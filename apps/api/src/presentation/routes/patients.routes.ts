@@ -13,20 +13,70 @@ const errorSchema = z.object({
   correlationId: z.string().optional(),
 });
 
-const patientResponseSchema = z.object({
-  patient_id: z.string(),
-  full_name: z.string(),
-  date_of_birth: z.string(),
-  diagnosis_year: z.number(),
-  target_glucose_min_mgdl: z.number(),
-  target_glucose_max_mgdl: z.number(),
-  insulin_type_basal: z.string().nullable(),
-  insulin_type_bolus: z.string().nullable(),
-  icr_units_per_gram_carb: z.number().nullable(),
-  isf_mgdl_per_unit: z.number().nullable(),
-  is_active: z.boolean(),
-  created_at: z.string(),
+// camelCase schema matching shared-types PatientProfile
+const patientProfileSchema = z.object({
+  id: z.string(),
+  fullName: z.string(),
+  dateOfBirth: z.string(),
+  diagnosisYear: z.number(),
+  targetGlucoseMinMgdl: z.number(),
+  targetGlucoseMaxMgdl: z.number(),
+  insulinTypeBasal: z.string().nullable(),
+  insulinTypeBolus: z.string().nullable(),
+  icrUnitsPerGramCarb: z.number().nullable(),
+  isfMgdlPerUnit: z.number().nullable(),
+  isActive: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
+
+function mapPatientProfile(profile: {
+  id: string;
+  fullName: string;
+  dateOfBirth: Date;
+  diagnosisYear: number;
+  targetGlucoseMinMgdl: number;
+  targetGlucoseMaxMgdl: number;
+  insulinTypeBasal: string | null;
+  insulinTypeBolus: string | null;
+  icrUnitsPerGramCarb: unknown;
+  isfMgdlPerUnit: unknown;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: profile.id,
+    fullName: profile.fullName,
+    dateOfBirth: profile.dateOfBirth.toISOString().split("T")[0] ?? "",
+    diagnosisYear: profile.diagnosisYear,
+    targetGlucoseMinMgdl: profile.targetGlucoseMinMgdl,
+    targetGlucoseMaxMgdl: profile.targetGlucoseMaxMgdl,
+    insulinTypeBasal: profile.insulinTypeBasal,
+    insulinTypeBolus: profile.insulinTypeBolus,
+    icrUnitsPerGramCarb: profile.icrUnitsPerGramCarb ? Number(profile.icrUnitsPerGramCarb) : null,
+    isfMgdlPerUnit: profile.isfMgdlPerUnit ? Number(profile.isfMgdlPerUnit) : null,
+    isActive: profile.isActive,
+    createdAt: profile.createdAt.toISOString(),
+    updatedAt: profile.updatedAt.toISOString(),
+  };
+}
+
+const PATIENT_SELECT = {
+  id: true,
+  fullName: true,
+  dateOfBirth: true,
+  diagnosisYear: true,
+  targetGlucoseMinMgdl: true,
+  targetGlucoseMaxMgdl: true,
+  insulinTypeBasal: true,
+  insulinTypeBolus: true,
+  icrUnitsPerGramCarb: true,
+  isfMgdlPerUnit: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 export default async function patientsRoutes(app: FastifyInstance) {
   // POST /patients
@@ -37,7 +87,7 @@ export default async function patientsRoutes(app: FastifyInstance) {
       schema: {
         body: createPatientSchema,
         response: {
-          201: z.object({ patient_id: z.string(), created_at: z.string() }),
+          201: patientProfileSchema,
           403: errorSchema,
           422: errorSchema,
         },
@@ -84,7 +134,7 @@ export default async function patientsRoutes(app: FastifyInstance) {
             isfMgdlPerUnit: body.isf_mgdl_per_unit ?? null,
             createdByUserId: jwtUser.sub,
           },
-          select: { id: true, createdAt: true },
+          select: PATIENT_SELECT,
         });
 
         // Auto-create primary guardian assignment
@@ -125,10 +175,7 @@ export default async function patientsRoutes(app: FastifyInstance) {
         userAgent,
       });
 
-      return reply.status(201).send({
-        patient_id: patient.id,
-        created_at: patient.createdAt.toISOString(),
-      });
+      return reply.status(201).send(mapPatientProfile(patient));
     },
   );
 
@@ -139,7 +186,7 @@ export default async function patientsRoutes(app: FastifyInstance) {
       preHandler: [app.authenticate, requirePatientAccess],
       schema: {
         params: z.object({ patientId: z.string().uuid() }),
-        response: { 200: patientResponseSchema, 403: errorSchema, 404: errorSchema },
+        response: { 200: patientProfileSchema, 403: errorSchema, 404: errorSchema },
       },
     },
     async (request, reply) => {
@@ -148,6 +195,7 @@ export default async function patientsRoutes(app: FastifyInstance) {
 
       const profile = await prisma.patientProfile.findUnique({
         where: { id: patientId },
+        select: PATIENT_SELECT,
       });
       if (!profile || !profile.isActive) {
         return reply.status(404).send({
@@ -157,22 +205,7 @@ export default async function patientsRoutes(app: FastifyInstance) {
         });
       }
 
-      return reply.status(200).send({
-        patient_id: profile.id,
-        full_name: profile.fullName,
-        date_of_birth: profile.dateOfBirth.toISOString().split("T")[0] ?? "",
-        diagnosis_year: profile.diagnosisYear,
-        target_glucose_min_mgdl: profile.targetGlucoseMinMgdl,
-        target_glucose_max_mgdl: profile.targetGlucoseMaxMgdl,
-        insulin_type_basal: profile.insulinTypeBasal,
-        insulin_type_bolus: profile.insulinTypeBolus,
-        icr_units_per_gram_carb: profile.icrUnitsPerGramCarb
-          ? Number(profile.icrUnitsPerGramCarb)
-          : null,
-        isf_mgdl_per_unit: profile.isfMgdlPerUnit ? Number(profile.isfMgdlPerUnit) : null,
-        is_active: profile.isActive,
-        created_at: profile.createdAt.toISOString(),
-      });
+      return reply.status(200).send(mapPatientProfile(profile));
     },
   );
 }

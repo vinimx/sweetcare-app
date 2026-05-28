@@ -52,7 +52,7 @@ function SettingsRow({
       </View>
       <View style={styles.rowContent}>
         <Text
-          variant="bodyMd"
+          variant="body"
           color={destructive ? theme.colors.error.DEFAULT : theme.colors.text.primary}
         >
           {label}

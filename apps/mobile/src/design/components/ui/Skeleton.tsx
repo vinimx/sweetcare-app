@@ -7,6 +7,7 @@ interface SkeletonProps {
   width?: number | `${number}%`;
   height: number;
   radius?: keyof typeof radii;
+  borderRadius?: number;
   animated?: boolean;
   style?: ViewStyle;
 }
@@ -15,6 +16,7 @@ export function Skeleton({
   width = "100%",
   height,
   radius = "md",
+  borderRadius,
   animated = true,
   style,
 }: SkeletonProps) {
@@ -41,7 +43,7 @@ export function Skeleton({
         {
           width,
           height,
-          borderRadius: theme.radii[radius],
+          borderRadius: borderRadius ?? theme.radii[radius],
           backgroundColor: theme.colors.border.DEFAULT,
           opacity: animated ? opacity : 0.4,
         },

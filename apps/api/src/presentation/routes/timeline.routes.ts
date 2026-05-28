@@ -68,6 +68,7 @@ export default async function timelineRoutes(app: FastifyInstance) {
             next_cursor: z.string().nullable(),
             total_count: z.number(),
           }),
+          400: errorSchema,
           403: errorSchema,
         },
       },
@@ -106,10 +107,9 @@ export default async function timelineRoutes(app: FastifyInstance) {
       }
 
       const baseQuery = {
-        from: query.from ? new Date(query.from) : undefined,
-        to: cursorDate ?? (query.to ? new Date(query.to) : undefined),
         limit: query.limit + 1,
-        cursor: undefined as string | undefined,
+        ...(query.from && { from: new Date(query.from) }),
+        ...(cursorDate ? { to: cursorDate } : query.to ? { to: new Date(query.to) } : {}),
       };
 
       // Fetch oversized pages to allow merge + sort + cursor slicing

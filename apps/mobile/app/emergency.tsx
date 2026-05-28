@@ -253,7 +253,7 @@ export default function EmergencyScreen() {
                           {i + 1}
                         </Text>
                       </View>
-                      <Text variant="bodyMd" style={styles.stepText}>
+                      <Text variant="body" style={styles.stepText}>
                         {step}
                       </Text>
                     </View>

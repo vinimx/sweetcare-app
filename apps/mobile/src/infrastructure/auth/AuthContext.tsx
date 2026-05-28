@@ -6,6 +6,17 @@ import type { User, PatientProfile, AuthTokens } from "@sweetcare/shared-types";
 
 const ACTIVE_PATIENT_KEY = "sc_active_patient_id";
 
+interface AuthLoginResponse extends AuthTokens {
+  refreshToken: string;
+  userId: string;
+  role: string;
+  user: User;
+}
+
+interface AuthRefreshResponse extends AuthTokens {
+  refreshToken: string;
+}
+
 interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -74,8 +85,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const refreshToken = await tokenStorage.getRefreshToken();
       if (!refreshToken) return null;
       try {
-        const data = await apiClient.post<AuthTokens>("/auth/refresh", {}, false);
+        const data = await apiClient.post<AuthRefreshResponse>(
+          "/auth/refresh",
+          { refreshToken },
+          false,
+        );
         await tokenStorage.saveAccessToken(data.accessToken);
+        await tokenStorage.saveRefreshToken(data.refreshToken);
         return data.accessToken;
       } catch {
         await tokenStorage.clearAll();
@@ -92,23 +108,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const data = await apiClient.post<AuthTokens & { user: User }>(
-      "/auth/login",
-      { email, password },
-      false,
-    );
+    const data = await apiClient.post<AuthLoginResponse>("/auth/login", { email, password }, false);
     await tokenStorage.saveAccessToken(data.accessToken);
+    await tokenStorage.saveRefreshToken(data.refreshToken);
     setState((s) => ({ ...s, isAuthenticated: true, user: data.user }));
   }, []);
 
   const register = useCallback(
     async (input: { email: string; password: string; display_name: string }) => {
-      const data = await apiClient.post<AuthTokens & { user: User }>(
+      const data = await apiClient.post<AuthLoginResponse>(
         "/auth/register",
         { ...input, role: "guardian" },
         false,
       );
       await tokenStorage.saveAccessToken(data.accessToken);
+      await tokenStorage.saveRefreshToken(data.refreshToken);
       setState((s) => ({ ...s, isAuthenticated: true, user: data.user }));
     },
     [],
@@ -116,7 +130,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await apiClient.post("/auth/logout", {});
+      const refreshToken = await tokenStorage.getRefreshToken();
+      await apiClient.post("/auth/logout", refreshToken ? { refreshToken } : {});
     } catch {
       /* best effort */
     }

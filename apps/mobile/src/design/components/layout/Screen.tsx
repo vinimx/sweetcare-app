@@ -78,7 +78,7 @@ export function Screen({
   const content = loading ? (
     <LoadingSkeleton />
   ) : error ? (
-    <EmptyState variant="loadError" description={error.message} />
+    <EmptyState variant="loadError" message={error.message} />
   ) : (
     children
   );

@@ -86,13 +86,13 @@ function SymptomCard({ record, onPress }: { record: SymptomRecord; onPress?: () 
         </View>
         <View style={styles.symptomInfo}>
           <View style={styles.topRow}>
-            <Text variant="bodyMd" style={styles.flex} numberOfLines={1}>
+            <Text variant="body" style={styles.flex} numberOfLines={1}>
               {record.symptomCodes.length} sintoma{record.symptomCodes.length !== 1 ? "s" : ""}{" "}
               registrado{record.symptomCodes.length !== 1 ? "s" : ""}
             </Text>
             <Badge
               variant="severity"
-              severityLevel={record.severityLevel}
+              severity={record.severityLevel}
               label={
                 record.severityLevel === "mild"
                   ? "Leve"
@@ -143,7 +143,7 @@ function AlertCard({ alert, onPress }: { alert: AlertEvent; onPress?: () => void
       <View style={styles.alertRow}>
         <Icon name="bell" size="md" color={isEmergency ? "#fff" : "#DC2626"} />
         <View style={styles.alertInfo}>
-          <Text variant="bodyMd" color={isEmergency ? "#fff" : "#DC2626"} numberOfLines={1}>
+          <Text variant="body" color={isEmergency ? "#fff" : "#DC2626"} numberOfLines={1}>
             {ALERT_TYPE_LABELS[alert.alertType] ?? alert.alertType}
           </Text>
           {alert.resolvedAt ? (

@@ -1,7 +1,6 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import { Text } from "./Text.js";
-import { Button } from "./Button.js";
 import { Icon } from "./Icon.js";
 import { useTheme } from "../../contexts/ThemeContext.js";
 
@@ -9,9 +8,9 @@ type EmptyVariant = "default" | "offline" | "noRecords" | "noPatient" | "loadErr
 
 interface EmptyStateProps {
   title?: string;
-  description?: string;
+  message?: string;
   variant?: EmptyVariant;
-  action?: { label: string; onPress: () => void; accessibilityLabel: string };
+  action?: React.ReactNode;
 }
 
 const VARIANT_DEFAULTS: Record<EmptyVariant, { icon: string; title: string; desc?: string }> = {
@@ -38,7 +37,7 @@ const VARIANT_DEFAULTS: Record<EmptyVariant, { icon: string; title: string; desc
   },
 };
 
-export function EmptyState({ title, description, variant = "default", action }: EmptyStateProps) {
+export function EmptyState({ title, message, variant = "default", action }: EmptyStateProps) {
   const { theme } = useTheme();
   const defaults = VARIANT_DEFAULTS[variant];
 
@@ -50,21 +49,12 @@ export function EmptyState({ title, description, variant = "default", action }: 
       <Text variant="h3" align="center" color={theme.colors.text.primary} style={styles.title}>
         {title ?? defaults.title}
       </Text>
-      {(description ?? defaults.desc) && (
+      {(message ?? defaults.desc) && (
         <Text variant="body" align="center" color={theme.colors.text.secondary} style={styles.desc}>
-          {description ?? defaults.desc}
+          {message ?? defaults.desc}
         </Text>
       )}
-      {action && (
-        <Button
-          variant="secondary"
-          size="md"
-          label={action.label}
-          onPress={action.onPress}
-          accessibilityLabel={action.accessibilityLabel}
-          style={styles.action}
-        />
-      )}
+      {action && <View style={styles.action}>{action}</View>}
     </View>
   );
 }

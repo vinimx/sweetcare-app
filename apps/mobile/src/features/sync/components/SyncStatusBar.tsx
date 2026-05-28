@@ -51,7 +51,7 @@ export default function SyncStatusBar({ patientId, onConflictsPress }: Props) {
   return (
     <View
       style={[styles.bar, syncState === "error" && styles.barError]}
-      accessibilityRole="status"
+      accessibilityRole="none"
       accessibilityLabel={`${String(pendingCount)} registros pendentes de sincronização`}
     >
       {syncState === "syncing" ? (
