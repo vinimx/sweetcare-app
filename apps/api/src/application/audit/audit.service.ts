@@ -67,6 +67,10 @@ export function auditAlertGenerated(params: Omit<AuditParams, "operation">): Pro
   return writeAuditEntry({ ...params, operation: "alert_generated" });
 }
 
+export function auditUpdate(params: Omit<AuditParams, "operation">): Promise<void> {
+  return writeAuditEntry({ ...params, operation: "update" });
+}
+
 export function auditDelete(params: Omit<AuditParams, "operation">): Promise<void> {
   return writeAuditEntry({ ...params, operation: "delete" });
 }

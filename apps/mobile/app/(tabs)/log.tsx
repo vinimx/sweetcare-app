@@ -10,6 +10,7 @@ import { useAuth } from "../../src/infrastructure/auth/AuthContext.js";
 import { useRouter } from "expo-router";
 import InsulinLogScreen from "../../src/features/insulin/screens/InsulinLogScreen.js";
 import SymptomRecordScreen from "../../src/features/symptoms/screens/SymptomRecordScreen.js";
+import type { SuccessSignal } from "../../src/infrastructure/api/timeline.types.js";
 
 type Tab = "insulin" | "symptom";
 
@@ -25,8 +26,10 @@ export default function LogScreen() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("insulin");
 
-  function handleSuccess() {
+  function handleSuccess(type: "insulin" | "symptom") {
+    queryClient.setQueryData<SuccessSignal>(["_success_signal"], { type, ts: Date.now() });
     void queryClient.invalidateQueries({ queryKey: ["timeline", activePatient?.id] });
+    router.navigate("/");
   }
 
   if (!activePatient) {
@@ -107,9 +110,19 @@ export default function LogScreen() {
       {/* Form */}
       <View style={styles.formContainer}>
         {activeTab === "insulin" ? (
-          <InsulinLogScreen patientId={activePatient.id} onSuccess={handleSuccess} />
+          <InsulinLogScreen
+            patientId={activePatient.id}
+            onSuccess={() => {
+              handleSuccess("insulin");
+            }}
+          />
         ) : (
-          <SymptomRecordScreen patientId={activePatient.id} onSuccess={handleSuccess} />
+          <SymptomRecordScreen
+            patientId={activePatient.id}
+            onSuccess={() => {
+              handleSuccess("symptom");
+            }}
+          />
         )}
       </View>
     </SafeAreaView>

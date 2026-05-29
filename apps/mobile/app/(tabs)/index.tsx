@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import {
   View,
   FlatList,
@@ -6,9 +6,10 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "../../src/design/components/ui/Text.js";
 import { Icon } from "../../src/design/components/ui/Icon.js";
@@ -21,46 +22,15 @@ import { useTheme } from "../../src/design/contexts/ThemeContext.js";
 import { useAuth } from "../../src/infrastructure/auth/AuthContext.js";
 import { apiClient } from "../../src/infrastructure/api/client.js";
 import type {
-  InsulinApplicationRecord,
-  InsulinDoseRationale,
-  SeverityLevel,
-} from "@sweetcare/shared-types";
-
-/* ── Local API response types (snake_case — actual API contract) ─── */
-interface ApiInsulinData {
-  record_id: string;
-  client_id: string;
-  insulin_type: string;
-  dose_units: number;
-  dose_rationale: InsulinDoseRationale;
-  meal_carbs_grams: number | null;
-  glucose_before_mgdl: number | null;
-  administration_site: string | null;
-  notes: string | null;
-  applied_at: string;
-  timezone: string;
-}
-
-interface ApiSymptomData {
-  record_id: string;
-  client_id: string;
-  symptom_codes: string[];
-  severity_level: SeverityLevel;
-  glucose_reading_mgdl: number | null;
-  notes: string | null;
-  observed_at: string;
-  timezone: string;
-}
-
-type ApiInsulinEvent = { type: "insulin"; event_time: string; data: ApiInsulinData };
-type ApiSymptomEvent = { type: "symptom"; event_time: string; data: ApiSymptomData };
-type ApiTimelineEvent = ApiInsulinEvent | ApiSymptomEvent;
-
-interface TimelineResponse {
-  events: ApiTimelineEvent[];
-  next_cursor: string | null;
-  total_count: number;
-}
+  ApiInsulinData,
+  ApiSymptomData,
+  ApiInsulinEvent,
+  ApiSymptomEvent,
+  ApiTimelineEvent,
+  TimelineResponse,
+  SuccessSignal,
+} from "../../src/infrastructure/api/timeline.types.js";
+import type { InsulinApplicationRecord } from "@sweetcare/shared-types";
 
 /* ── Adapt snake_case API data → DoseCard's InsulinApplicationRecord ─ */
 function toInsulinRecord(d: ApiInsulinData): InsulinApplicationRecord {
@@ -215,12 +185,56 @@ function buildFlatList(events: ApiTimelineEvent[]): FlatItem[] {
   return items;
 }
 
+const SUCCESS_MESSAGES: Record<string, string> = {
+  insulin: "Insulina registrada com sucesso!",
+  symptom: "Sintoma registrado com sucesso!",
+  correction: "Correção registrada com sucesso!",
+  edit: "Registro atualizado com sucesso!",
+  delete: "Registro excluído com sucesso!",
+};
+
 /* ── HomeScreen ──────────────────────────────────────────────────── */
 export default function HomeScreen() {
   const { theme } = useTheme();
   const { activePatient } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
+  /* ── Success banner ────────────────────────────────────────────── */
+  const { data: successSignal } = useQuery<SuccessSignal | null>({
+    queryKey: ["_success_signal"],
+    queryFn: () => null,
+    staleTime: Infinity,
+    gcTime: 10_000,
+    initialData: null,
+  });
+  const lastSignalTs = useRef(0);
+  const [bannerText, setBannerText] = useState<string | null>(null);
+  const bannerOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (successSignal && successSignal.ts > lastSignalTs.current) {
+      lastSignalTs.current = successSignal.ts;
+      const msg = SUCCESS_MESSAGES[successSignal.type] ?? "Registro salvo!";
+      setBannerText(msg);
+      bannerOpacity.setValue(1);
+      const t = setTimeout(() => {
+        Animated.timing(bannerOpacity, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }).start(() => {
+          setBannerText(null);
+          queryClient.removeQueries({ queryKey: ["_success_signal"] });
+        });
+      }, 2600);
+      return () => {
+        clearTimeout(t);
+      };
+    }
+  }, [successSignal, bannerOpacity, queryClient]);
+
+  /* ── Timeline query ────────────────────────────────────────────── */
   const { data, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ["timeline", activePatient?.id],
     queryFn: () =>
@@ -332,6 +346,23 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* ── Success banner ───────────────────────────── */}
+      {bannerText && (
+        <Animated.View
+          style={[
+            styles.successBanner,
+            { backgroundColor: theme.colors.success.DEFAULT, opacity: bannerOpacity },
+          ]}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
+          <Icon name="check-circle" size="sm" color="#fff" />
+          <Text variant="bodySm" color="#fff" style={{ fontWeight: "600", flex: 1 }}>
+            {bannerText}
+          </Text>
+        </Animated.View>
+      )}
+
       {/* ── Timeline ─────────────────────────────────── */}
       {isLoading ? (
         <View style={styles.skeletons}>
@@ -397,10 +428,34 @@ export default function HomeScreen() {
             }
 
             if (item.kind === "insulin") {
-              return <DoseCard record={toInsulinRecord(item.event.data)} />;
+              return (
+                <DoseCard
+                  record={toInsulinRecord(item.event.data)}
+                  onPress={() => {
+                    router.push({
+                      pathname: "/records/insulin/[id]",
+                      params: { id: item.event.data.record_id },
+                    });
+                  }}
+                />
+              );
             }
 
-            return <SymptomCard record={item.event.data} />;
+            return (
+              <TouchableOpacity
+                activeOpacity={0.72}
+                onPress={() => {
+                  router.push({
+                    pathname: "/records/symptom/[id]",
+                    params: { id: item.event.data.record_id },
+                  });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Ver detalhes do registro de sintoma"
+              >
+                <SymptomCard record={item.event.data} />
+              </TouchableOpacity>
+            );
           }}
           ListFooterComponent={
             data && data.total_count > data.events.length ? (
@@ -443,6 +498,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+  },
+
+  /* Success banner */
+  successBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
 
   /* List */

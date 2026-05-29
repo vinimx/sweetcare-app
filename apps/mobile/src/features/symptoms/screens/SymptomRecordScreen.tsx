@@ -12,6 +12,7 @@ import { useState, useMemo } from "react";
 import { computeMinimumSeverity } from "@sweetcare/shared-validation";
 import type { SymptomCode, SeverityLevel } from "@sweetcare/shared-types";
 import { queueSymptomRecord } from "../../../infrastructure/sync/offline-queue.js";
+import { apiClient } from "../../../infrastructure/api/client.js";
 import { generateUUID } from "../../../infrastructure/utils/uuid.js";
 
 const SYMPTOM_OPTIONS: { code: SymptomCode; label: string; emoji: string }[] = [
@@ -34,16 +35,35 @@ const SEVERITY_OPTIONS: { value: SeverityLevel; label: string; color: string }[]
   { value: "emergency", label: "Emergência", color: "#7F1D1D" },
 ];
 
+export interface SymptomInitialData {
+  selectedCodes?: SymptomCode[];
+  severityOverride?: SeverityLevel;
+  glucoseReading?: string;
+  notes?: string;
+}
+
 interface Props {
   patientId: string;
   onSuccess?: () => void;
+  initialData?: SymptomInitialData;
+  recordId?: string; // When set: update mode (PATCH); absent: create mode (POST)
 }
 
-export default function SymptomRecordScreen({ patientId, onSuccess }: Props) {
-  const [selectedCodes, setSelectedCodes] = useState<SymptomCode[]>([]);
-  const [severityOverride, setSeverityOverride] = useState<SeverityLevel | null>(null);
-  const [glucoseReading, setGlucoseReading] = useState("");
-  const [notes, setNotes] = useState("");
+export default function SymptomRecordScreen({
+  patientId,
+  onSuccess,
+  initialData,
+  recordId,
+}: Props) {
+  const isEditMode = !!recordId;
+  const [selectedCodes, setSelectedCodes] = useState<SymptomCode[]>(
+    initialData?.selectedCodes ?? [],
+  );
+  const [severityOverride, setSeverityOverride] = useState<SeverityLevel | null>(
+    initialData?.severityOverride ?? null,
+  );
+  const [glucoseReading, setGlucoseReading] = useState(initialData?.glucoseReading ?? "");
+  const [notes, setNotes] = useState(initialData?.notes ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -58,7 +78,6 @@ export default function SymptomRecordScreen({ patientId, onSuccess }: Props) {
     setSelectedCodes((prev) =>
       prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
     );
-    // Reset override when symptoms change so minimum gets recomputed
     setSeverityOverride(null);
   };
 
@@ -78,25 +97,39 @@ export default function SymptomRecordScreen({ patientId, onSuccess }: Props) {
     if (!validate() || !effectiveSeverity) return;
     setSubmitting(true);
     try {
-      const clientId = generateUUID();
-      const glucose = glucoseReading ? parseInt(glucoseReading, 10) : undefined;
+      const glucose = glucoseReading ? parseInt(glucoseReading, 10) : null;
 
-      const result = await queueSymptomRecord(patientId, {
-        client_id: clientId,
-        symptom_codes: selectedCodes,
-        severity_level: effectiveSeverity,
-        glucose_reading_mgdl: glucose,
-        notes: notes.trim() || undefined,
-        observed_at: new Date().toISOString(),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      });
-
-      if (result.status === "queued") {
-        Alert.alert(
-          "Salvo offline",
-          "Sem conexão. O registro será sincronizado quando você estiver online.",
-        );
+      if (isEditMode) {
+        await apiClient.patch(`/patients/${patientId}/symptoms/${recordId}`, {
+          symptom_codes: selectedCodes,
+          severity_level: effectiveSeverity,
+          glucose_reading_mgdl: isNaN(glucose ?? NaN) ? null : glucose,
+          notes: notes.trim() || null,
+        });
+      } else {
+        const clientId = generateUUID();
+        const result = await queueSymptomRecord(patientId, {
+          client_id: clientId,
+          symptom_codes: selectedCodes,
+          severity_level: effectiveSeverity,
+          glucose_reading_mgdl: isNaN(glucose ?? NaN) ? undefined : (glucose ?? undefined),
+          notes: notes.trim() || undefined,
+          observed_at: new Date().toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        });
+        if (result.status === "queued") {
+          Alert.alert(
+            "Salvo offline",
+            "Sem conexão. O registro será sincronizado quando você estiver online.",
+          );
+        }
       }
+
+      setSelectedCodes([]);
+      setSeverityOverride(null);
+      setGlucoseReading("");
+      setNotes("");
+      setErrors({});
       onSuccess?.();
     } catch (error) {
       Alert.alert("Erro", error instanceof Error ? error.message : "Tente novamente.");
@@ -109,7 +142,7 @@ export default function SymptomRecordScreen({ patientId, onSuccess }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Registrar Sintomas</Text>
+      <Text style={styles.heading}>{isEditMode ? "Editar Sintoma" : "Registrar Sintomas"}</Text>
 
       {isEmergency && (
         <View style={styles.emergencyBanner} accessibilityRole="alert">
@@ -225,13 +258,13 @@ export default function SymptomRecordScreen({ patientId, onSuccess }: Props) {
         }}
         disabled={submitting}
         accessibilityRole="button"
-        accessibilityLabel="Registrar sintomas"
+        accessibilityLabel={isEditMode ? "Salvar alterações" : "Registrar sintomas"}
         accessibilityState={{ disabled: submitting }}
       >
         {submitting ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.buttonText}>Registrar</Text>
+          <Text style={styles.buttonText}>{isEditMode ? "Salvar Alterações" : "Registrar"}</Text>
         )}
       </TouchableOpacity>
     </ScrollView>

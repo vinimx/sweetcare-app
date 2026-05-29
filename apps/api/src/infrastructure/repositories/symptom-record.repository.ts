@@ -42,6 +42,45 @@ export async function upsertSymptomRecord(
   return [created, true];
 }
 
+export interface UpdateSymptomRecordData {
+  symptomCodes?: string[];
+  severityLevel?: "mild" | "moderate" | "severe" | "emergency";
+  glucoseReadingMgdl?: number | null;
+  notes?: string | null;
+}
+
+export async function updateSymptomRecord(
+  id: string,
+  patientId: string,
+  data: UpdateSymptomRecordData,
+): Promise<SymptomRecord | null> {
+  const prisma = getPrismaClient();
+  const existing = await prisma.symptomRecord.findFirst({
+    where: { id, patientProfileId: patientId },
+  });
+  if (!existing) return null;
+
+  return prisma.symptomRecord.update({
+    where: { id },
+    data: {
+      ...(data.symptomCodes !== undefined && { symptomCodes: data.symptomCodes }),
+      ...(data.severityLevel !== undefined && { severityLevel: data.severityLevel }),
+      ...(data.glucoseReadingMgdl !== undefined && { glucoseReadingMgdl: data.glucoseReadingMgdl }),
+      ...(data.notes !== undefined && { notes: data.notes }),
+    },
+  });
+}
+
+export async function deleteSymptomRecord(id: string, patientId: string): Promise<boolean> {
+  const prisma = getPrismaClient();
+  const existing = await prisma.symptomRecord.findFirst({
+    where: { id, patientProfileId: patientId },
+  });
+  if (!existing) return false;
+  await prisma.symptomRecord.delete({ where: { id } });
+  return true;
+}
+
 export async function getPatientSymptomRecords(
   patientId: string,
   query: SymptomRecordQuery,

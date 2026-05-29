@@ -3,12 +3,15 @@ import type { CreateInsulinRecordInput } from "../../domain/entities/insulin-app
 import { validateInsulinRecord } from "../../domain/entities/insulin-application-record.entity.js";
 import {
   upsertInsulinRecord,
+  updateInsulinRecord as updateInsulinRecordRepo,
+  deleteInsulinRecord as deleteInsulinRecordRepo,
   getPatientInsulinRecords,
   type InsulinRecordQuery,
   type PaginatedInsulinRecords,
+  type UpdateInsulinRecordData,
 } from "../../infrastructure/repositories/insulin-record.repository.js";
 import { hasActiveConsent } from "../../domain/services/caregiver-access.guard.js";
-import { auditCreate } from "../audit/audit.service.js";
+import { auditCreate, auditUpdate, auditDelete } from "../audit/audit.service.js";
 
 export interface CreateRecordContext {
   actorUserId: string;
@@ -56,6 +59,69 @@ export async function createInsulinRecord(
   }
 
   return { record, isNew };
+}
+
+export async function updateInsulinRecord(
+  recordId: string,
+  patientId: string,
+  input: UpdateInsulinRecordData,
+  ctx: CreateRecordContext,
+): Promise<InsulinApplicationRecord> {
+  const consentActive = await hasActiveConsent(ctx.actorUserId, patientId);
+  if (!consentActive) {
+    const err = new Error("CONSENT_REVOKED") as Error & { statusCode: number };
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const record = await updateInsulinRecordRepo(recordId, patientId, input);
+  if (!record) {
+    const err = new Error("Record not found") as Error & { statusCode: number };
+    err.statusCode = 404;
+    throw err;
+  }
+
+  void auditUpdate({
+    actorUserId: ctx.actorUserId,
+    correlationId: ctx.correlationId,
+    targetTable: "insulin_application_records",
+    targetId: recordId,
+    diffSummary: { fieldsUpdated: Object.keys(input) },
+    ipAddress: ctx.ipAddress,
+    userAgent: ctx.userAgent,
+  });
+
+  return record;
+}
+
+export async function deleteInsulinRecord(
+  recordId: string,
+  patientId: string,
+  ctx: CreateRecordContext,
+): Promise<void> {
+  const consentActive = await hasActiveConsent(ctx.actorUserId, patientId);
+  if (!consentActive) {
+    const err = new Error("CONSENT_REVOKED") as Error & { statusCode: number };
+    err.statusCode = 403;
+    throw err;
+  }
+
+  void auditDelete({
+    actorUserId: ctx.actorUserId,
+    correlationId: ctx.correlationId,
+    targetTable: "insulin_application_records",
+    targetId: recordId,
+    diffSummary: {},
+    ipAddress: ctx.ipAddress,
+    userAgent: ctx.userAgent,
+  });
+
+  const deleted = await deleteInsulinRecordRepo(recordId, patientId);
+  if (!deleted) {
+    const err = new Error("Record not found") as Error & { statusCode: number };
+    err.statusCode = 404;
+    throw err;
+  }
 }
 
 export async function listInsulinRecords(

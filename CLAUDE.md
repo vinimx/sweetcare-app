@@ -153,8 +153,8 @@ sweetcare-app/
 │   │   │   │   ├── auth/
 │   │   │   │   │   └── auth.service.ts     ← register, login, refresh, logout, grantConsent
 │   │   │   │   └── services/
-│   │   │   │       ├── insulin-record.service.ts      ← createInsulinRecord, listInsulinRecords
-│   │   │   │       ├── symptom-record.service.ts      ← createSymptomRecord, listSymptomRecords (dispara alerta)
+│   │   │   │       ├── insulin-record.service.ts      ← createInsulinRecord, updateInsulinRecord, deleteInsulinRecord, listInsulinRecords
+│   │   │   │       ├── symptom-record.service.ts      ← createSymptomRecord, updateSymptomRecord, deleteSymptomRecord, listSymptomRecords (dispara alerta)
 │   │   │   │       ├── sync-batch.service.ts          ← processSyncBatch, getSyncStatus, resolveConflict
 │   │   │   │       ├── insight-aggregation.service.ts ← aggregatePatientData (strip PHI → AggregatedRecord[])
 │   │   │   │       └── data-rights.service.ts         ← exportUserData, deleteUserAccount (LGPD Art. 18)
@@ -178,8 +178,8 @@ sweetcare-app/
 │   │   │   │   ├── notifications/
 │   │   │   │   │   └── push-notification.service.ts ← sendAlertNotification (PHI-free stub; FCM/APNs)
 │   │   │   │   └── repositories/
-│   │   │   │       ├── insulin-record.repository.ts    ← upsertInsulinRecord, getPatientInsulinRecords, findBolusRecordsInWindow
-│   │   │   │       ├── symptom-record.repository.ts    ← upsertSymptomRecord, getPatientSymptomRecords
+│   │   │   │       ├── insulin-record.repository.ts    ← upsertInsulinRecord, updateInsulinRecord, deleteInsulinRecord, getPatientInsulinRecords, findBolusRecordsInWindow
+│   │   │   │       ├── symptom-record.repository.ts    ← upsertSymptomRecord, updateSymptomRecord, deleteSymptomRecord, getPatientSymptomRecords
 │   │   │   │       ├── alert-event.repository.ts       ← createAlertEvent, getPatientAlerts, resolveAlert
 │   │   │   │       └── insight-report.repository.ts    ← createInsightReport, getReportById, listPatientReports, updateReportCompleted/Failed
 │   │   │   └── presentation/routes/
@@ -187,8 +187,8 @@ sweetcare-app/
 │   │   │       ├── auth.routes.ts          ← GET /users/me, register, login, refresh, logout, MFA stub
 │   │   │       ├── consent.routes.ts       ← POST /consent, DELETE /consent/:id
 │   │   │       ├── patients.routes.ts      ← POST /patients, GET /patients/:id
-│   │   │       ├── insulin-records.routes.ts ← POST+GET /patients/:id/insulin-records
-│   │   │       ├── symptom-records.routes.ts ← POST+GET /patients/:id/symptoms
+│   │   │       ├── insulin-records.routes.ts ← POST+GET+PATCH+DELETE /patients/:id/insulin-records
+│   │   │       ├── symptom-records.routes.ts ← POST+GET+PATCH+DELETE /patients/:id/symptoms
 │   │   │       ├── sync.routes.ts          ← POST /sync/batch, GET /sync/status/:id, POST /sync/resolve-conflict
 │   │   │       ├── timeline.routes.ts      ← GET /patients/:id/timeline (insulin+symptom merged)
 │   │   │       ├── alerts.routes.ts        ← GET /patients/:id/alerts, GET /alerts/:id, PATCH /alerts/:id/resolve
@@ -222,8 +222,17 @@ sweetcare-app/
 │   │   │   │   └── settings.tsx       ← Perfil, paciente ativo, LGPD export/delete, logout
 │   │   │   ├── patients/
 │   │   │   │   └── new.tsx            ← Modal criação PatientProfile (nome, DOB, diagnóstico, alvos, insulinas)
-│   │   │   └── alerts/
-│   │   │       └── [alertId].tsx      ← Modal alerta: guidance steps, contatos emergência, resolver
+│   │   │   ├── alerts/
+│   │   │   │   └── [alertId].tsx      ← Modal alerta: guidance steps, contatos emergência, resolver
+│   │   │   └── records/
+│   │   │       ├── insulin/
+│   │   │       │   ├── [id].tsx       ← Detalhe do registro de insulina: hero dose, campos, editar/excluir
+│   │   │       │   └── edit/
+│   │   │       │       └── [id].tsx   ← Editar registro de insulina (PATCH via InsulinLogScreen)
+│   │   │       └── symptom/
+│   │   │           ├── [id].tsx       ← Detalhe do registro de sintoma: chips, severidade, editar/excluir
+│   │   │           └── edit/
+│   │   │               └── [id].tsx   ← Editar registro de sintoma (PATCH via SymptomRecordScreen)
 │   │   └── src/
 │   │       ├── design/
 │   │       │   ├── DESIGN_SYSTEM.md   ← Paleta, tipografia, espaçamento, componentes, acessibilidade
@@ -269,7 +278,8 @@ sweetcare-app/
 │   │       │       └── ReportDetailScreen.tsx      ← disclaimer + summary + findings + confidence indicators
 │   │       └── infrastructure/
 │   │           ├── api/
-│   │           │   └── client.ts          ← apiClient (get/post/patch/delete), ApiError, token refresh automático
+│   │           │   ├── client.ts          ← apiClient (get/post/patch/delete), ApiError, token refresh automático
+│   │           │   └── timeline.types.ts  ← ApiInsulinData, ApiSymptomData, ApiTimelineEvent, TimelineResponse, SuccessSignal
 │   │           ├── auth/
 │   │           │   └── AuthContext.tsx    ← AuthProvider + useAuth() (login, register, logout, setActivePatient)
 │   │           ├── storage/
@@ -395,8 +405,8 @@ sweetcare-app/
 | `ConsentRecord`            | `consent_records`             | Não (revogação apenas)        | —                                                     |
 | `PatientProfile`           | `patient_profiles`            | Sim                           | `fullName`, `insulinTypeBasal`, `insulinTypeBolus`    |
 | `CaregiverAssignment`      | `caregiver_assignments`       | Não (revogação apenas)        | —                                                     |
-| `InsulinApplicationRecord` | `insulin_application_records` | **Imutável**                  | `insulinType`, `glucoseBeforeMgdl` (String?), `notes` |
-| `SymptomRecord`            | `symptom_records`             | **Imutável**                  | `glucoseReadingMgdl` (String?), `notes`               |
+| `InsulinApplicationRecord` | `insulin_application_records` | Sim (CRUD)                    | `insulinType`, `glucoseBeforeMgdl` (String?), `notes` |
+| `SymptomRecord`            | `symptom_records`             | Sim (CRUD)                    | `glucoseReadingMgdl` (String?), `notes`               |
 | `AlertEvent`               | `alert_events`                | Parcial (apenas `resolvedAt`) | —                                                     |
 | `SyncEvent`                | `sync_events`                 | Não                           | `conflictDetails` (app layer)                         |
 | `AuditEntry`               | `audit_entries`               | **Imutável**                  | —                                                     |
@@ -454,18 +464,22 @@ User            ──< UserSession   (família de tokens / family invalidation)
 
 ### Phase 3 (US1) — Registros offline + sync
 
-| Método | Rota                            | Auth                         | Status          |
-| ------ | ------------------------------- | ---------------------------- | --------------- |
-| POST   | `/patients`                     | Bearer (guardian)            | ✅ Implementado |
-| GET    | `/patients/:id`                 | Bearer + CaregiverAssignment | ✅ Implementado |
-| POST   | `/patients/:id/insulin-records` | Bearer + write access        | ✅ Implementado |
-| GET    | `/patients/:id/insulin-records` | Bearer + CaregiverAssignment | ✅ Implementado |
-| POST   | `/patients/:id/symptoms`        | Bearer + write access        | ✅ Implementado |
-| GET    | `/patients/:id/symptoms`        | Bearer + CaregiverAssignment | ✅ Implementado |
-| POST   | `/sync/batch`                   | Bearer                       | ✅ Implementado |
-| GET    | `/sync/status/:patientId`       | Bearer + CaregiverAssignment | ✅ Implementado |
-| POST   | `/sync/resolve-conflict`        | Bearer                       | ✅ Implementado |
-| GET    | `/patients/:id/timeline`        | Bearer + CaregiverAssignment | ✅ Implementado |
+| Método | Rota                                      | Auth                         | Status          |
+| ------ | ----------------------------------------- | ---------------------------- | --------------- |
+| POST   | `/patients`                               | Bearer (guardian)            | ✅ Implementado |
+| GET    | `/patients/:id`                           | Bearer + CaregiverAssignment | ✅ Implementado |
+| POST   | `/patients/:id/insulin-records`           | Bearer + write access        | ✅ Implementado |
+| GET    | `/patients/:id/insulin-records`           | Bearer + CaregiverAssignment | ✅ Implementado |
+| PATCH  | `/patients/:id/insulin-records/:recordId` | Bearer + write access        | ✅ Implementado |
+| DELETE | `/patients/:id/insulin-records/:recordId` | Bearer + write access        | ✅ Implementado |
+| POST   | `/patients/:id/symptoms`                  | Bearer + write access        | ✅ Implementado |
+| GET    | `/patients/:id/symptoms`                  | Bearer + CaregiverAssignment | ✅ Implementado |
+| PATCH  | `/patients/:id/symptoms/:recordId`        | Bearer + write access        | ✅ Implementado |
+| DELETE | `/patients/:id/symptoms/:recordId`        | Bearer + write access        | ✅ Implementado |
+| POST   | `/sync/batch`                             | Bearer                       | ✅ Implementado |
+| GET    | `/sync/status/:patientId`                 | Bearer + CaregiverAssignment | ✅ Implementado |
+| POST   | `/sync/resolve-conflict`                  | Bearer                       | ✅ Implementado |
+| GET    | `/patients/:id/timeline`                  | Bearer + CaregiverAssignment | ✅ Implementado |
 
 ### Phase 4 (US2) — Alertas
 
@@ -1177,3 +1191,67 @@ Impacto: Novo componente `src/design/components/ui/DatePickerField.tsx` com dois
   Tela `app/patients/new.tsx` atualizada: campos `dateOfBirth` e `diagnosisYear` substituídos por `DatePickerField` com props de acessibilidade e validação preservadas.
 
 _Última atualização: 2026-05-29 — Contraste de placeholders + DatePickerField + typecheck/lint ✅_
+
+### 2026-05-29 — Timeline clicável + tela de detalhes + fluxo de correção
+
+**Decisão: Sinal de sucesso via React Query como estado global leve (sem Context/Redux)**
+Motivação: Após salvar um registro em `log.tsx`, a tab Início (`index.tsx`) precisa exibir um banner de confirmação. Passar estado via URL params não funciona (a navegação de tab pode descartar os params). Criar um Context específico seria overhead desnecessário. `queryClient.setQueryData(["_success_signal"], { type, ts })` + `useQuery({ queryKey: ["_success_signal"], initialData: null })` entrega reatividade automática (qualquer `setQueryData` re-renderiza os consumers) com zero nova dependência. O campo `ts: Date.now()` garante que dois saves consecutivos do mesmo tipo disparam re-renders distintos (comparação de referência).
+Impacto: `app/(tabs)/log.tsx`, `app/(tabs)/index.tsx`; `SuccessSignal` exportado de `src/infrastructure/api/timeline.types.ts`; banner com `Animated.Value` fade-in/fade-out usando `useNativeDriver: true`.
+
+**Decisão: Telas de detalhe leem do cache React Query (sem fetch próprio)**
+Motivação: A tela Início sempre carregou os dados de `["timeline", patientId]` antes de navegar — o cache está fresco. Um fetch adicional na tela de detalhe seria redundante e adicionaria latência visível. O padrão correto é: detalhe usa `useQuery` com a mesma query key (hit imediato de cache) + `staleTime: 5min`. Se o usuário abrir um link profundo sem passar pela home, a query refaz o fetch automaticamente.
+Impacto: `app/records/insulin/[id].tsx`, `app/records/symptom/[id].tsx`; sem endpoint novo; sem modificação no `apiClient`.
+
+**Decisão: "Excluir" exibe Alert explicativo em vez de chamar API**
+Motivação: `InsulinApplicationRecord` e `SymptomRecord` são imutáveis no banco (triggers PostgreSQL bloqueiam UPDATE/DELETE). Expor um botão que parece deletar mas falha silenciosamente seria confuso. Exibir um Alert educativo ("Registros médicos não podem ser excluídos...") preserva a imutabilidade e educa o usuário sobre o modelo de segurança do sistema.
+Impacto: `app/records/insulin/[id].tsx`, `app/records/symptom/[id].tsx`; nenhuma chamada de API criada para deleção.
+
+**Decisão: "Editar" abre formulário de correção pré-preenchido (novo registro, não PUT)**
+Motivação: Imutabilidade proíbe edição in-place. O fluxo correto é criar um novo registro marcado como correção — preserva audit trail, mantém o registro original para conformidade regulatória, e deixa claro na UI que é uma "Correção" (título e banner azul). `isCorrection={true}` + `initialData` no `InsulinLogScreen`/`SymptomRecordScreen` reutiliza 100% do formulário existente.
+Impacto: `app/records/insulin/edit/[id].tsx`, `app/records/symptom/edit/[id].tsx`; `InsulinLogScreen` e `SymptomRecordScreen` recebem props `isCorrection?: boolean` e `initialData?`; o formulário chama o mesmo endpoint `POST /patients/:id/insulin-records` (ou symptoms) — sem endpoint novo.
+
+**Decisão: Hierarquia de rotas plana (`edit/[id].tsx`) em vez de nested (`[id]/edit.tsx`)**
+Motivação: Expo Router não permite ter simultaneamente um arquivo `[id].tsx` e um diretório `[id]/` no mesmo nível — o sistema de arquivos resolve ambiguamente. A rota plana `records/insulin/edit/[id]` e `records/symptom/edit/[id]` elimina o conflito e mantém a hierarquia legível.
+Impacto: Navegação usa `{ pathname: "/records/insulin/edit/[id]", params: { id } }` em vez de template literal (Expo Router typed routes rejeita template literals dinâmicos; pathname + params é a forma type-safe).
+
+**Novas rotas mobile (Expo Router file-based)**
+
+| Arquivo                             | Rota                        | Descrição                          |
+| ----------------------------------- | --------------------------- | ---------------------------------- |
+| `app/records/insulin/[id].tsx`      | `/records/insulin/:id`      | Detalhes do registro de insulina   |
+| `app/records/symptom/[id].tsx`      | `/records/symptom/:id`      | Detalhes do registro de sintoma    |
+| `app/records/insulin/edit/[id].tsx` | `/records/insulin/edit/:id` | Formulário de correção de insulina |
+| `app/records/symptom/edit/[id].tsx` | `/records/symptom/edit/:id` | Formulário de correção de sintoma  |
+
+**Arquivo centralizado de tipos API**
+`src/infrastructure/api/timeline.types.ts` — tipos snake_case das respostas da API (`ApiInsulinData`, `ApiSymptomData`, `ApiInsulinEvent`, `ApiSymptomEvent`, `TimelineResponse`, `SuccessSignal`). Evita duplicação entre `index.tsx`, telas de detalhe e telas de edição. Qualquer nova tela que consome a timeline deve importar deste arquivo, não dos `@sweetcare/shared-types` (que usam camelCase).
+
+_Última atualização: 2026-05-29 — Timeline clicável + detalhes + correção + typecheck/lint ✅_
+
+### 2026-05-29 — CRUD completo para registros médicos + correções de fluxo
+
+**Decisão: InsulinApplicationRecord e SymptomRecord agora mutáveis (CRUD completo)**
+Motivação: Triggers de imutabilidade eram excessivamente restritivos para o caso de uso — cuidadores precisam corrigir erros de digitação sem criar registros "de correção" paralelos que poluem a timeline. `AuditEntry` permanece imutável; os registros médicos em si agora suportam UPDATE/DELETE com audit trail.
+Impacto: `enable-crud.sql` — remove triggers `insulin_records_immutable` e `symptom_records_immutable`; adiciona `ON DELETE CASCADE` nas FKs `audit_entries → insulin/symptom` e `alert_events → symptom_records`; adiciona policies RLS para UPDATE/DELETE. Novo endpoint `PATCH /patients/:id/insulin-records/:recordId` e `DELETE` equivalente. Mesmos endpoints para symptoms.
+
+**Decisão: Edit screens usam `recordId` prop (PATCH) em vez de `isCorrection` (POST duplicado)**
+Motivação: A abordagem anterior de criar um novo registro como "correção" poluía a timeline e confundia o usuário — o item editado permanecia e aparecia duplicado. PATCH no registro existente é a semântica correta e mantém o audit trail limpo.
+Impacto: `InsulinLogScreen` e `SymptomRecordScreen` — removida prop `isCorrection`, adicionada prop `recordId`; quando presente, o submit chama `apiClient.patch` em vez de `queueInsulinRecord/queueSymptomRecord`. Edit screens (`records/insulin/edit/[id].tsx`, `records/symptom/edit/[id].tsx`) passam `recordId={id}` e `severityOverride` no `initialData` do sintoma.
+
+**Decisão: Delete em detail screens com confirmação Alert nativa**
+Motivação: Alertas educativos de "imutabilidade" substituídos por delete real com Alert de confirmação (`Alert.alert` destrutivo) + `apiClient.delete` + invalidação de cache + navegação para home com sinal de sucesso "delete".
+Impacto: `records/insulin/[id].tsx` e `records/symptom/[id].tsx` — `useQueryClient` + estado `deleting`; `InsulinDetail`/`SymptomDetail` recebem `onDelete` e `deleting` como props; botão mostra "Excluindo..." durante a operação.
+
+**Decisão: `offline-queue.ts` migrado de `fetch` bruto para `apiClient`**
+Motivação: `fetch` bruto não tem refresh automático de token. Quando o access token (15min) expirava, `queueInsulinRecord` e `queueSymptomRecord` falhavam com "Valid access token required" mesmo com refresh token válido. `apiClient.post` já implementa o ciclo 401→refresh transparentemente via `setRefreshListener`.
+Impacto: `offline-queue.ts` — substituída a função `authHeaders()` + `fetch` por `apiClient.post`; QueueResult simplificado para `synced | queued`.
+
+**Decisão: SuccessSignal estendido com tipos `"edit"` e `"delete"`**
+Motivação: O banner de sucesso na home precisava de mensagens distintas para cada operação. Adicionar os tipos ao union preserva backward-compatibility e evita lógica de fallback.
+Impacto: `timeline.types.ts` — union expandido; `index.tsx` — `SUCCESS_MESSAGES` recebe entradas para "edit" e "delete".
+
+**Correção: campo Dose (decimal) não aceitava edição completa**
+Motivação: `parseFloat("4.") === 4` → `.toString() === "4"` — o decimal era truncado antes do usuário terminar de digitar. A solução é manter um estado string separado (`doseStr`) que o `TextInput` exibe diretamente; o parsing para número acontece apenas para a validação do formulário via `react-hook-form`.
+Impacto: `InsulinLogScreen.tsx` — estados `doseStr`, `carbsStr`, `glucoseStr` independentes do state do `Controller`.
+
+_Última atualização: 2026-05-29 — CRUD completo para registros médicos + offline-queue fix + typecheck/lint ✅_

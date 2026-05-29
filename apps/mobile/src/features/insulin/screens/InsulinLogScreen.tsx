@@ -13,6 +13,7 @@ import { useState } from "react";
 import { type z } from "zod";
 import { createInsulinRecordSchema } from "@sweetcare/shared-validation";
 import { queueInsulinRecord } from "../../../infrastructure/sync/offline-queue.js";
+import { apiClient } from "../../../infrastructure/api/client.js";
 import { generateUUID } from "../../../infrastructure/utils/uuid.js";
 
 type FormValues = z.infer<typeof createInsulinRecordSchema>;
@@ -37,18 +38,43 @@ const DOSE_RATIONALE_OPTIONS = [
   { value: "combination", label: "Combinada" },
 ] as const;
 
+export interface InsulinInitialData {
+  insulin_type?: string;
+  dose_units?: number;
+  dose_rationale?: "correction" | "meal_coverage" | "basal" | "combination";
+  meal_carbs_grams?: number;
+  glucose_before_mgdl?: number;
+  administration_site?: string;
+  notes?: string;
+}
+
 interface Props {
   patientId: string;
   onSuccess?: () => void;
+  initialData?: InsulinInitialData;
+  recordId?: string; // When set: update mode (PATCH); absent: create mode (POST)
 }
 
-export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
+export default function InsulinLogScreen({ patientId, onSuccess, initialData, recordId }: Props) {
+  const isEditMode = !!recordId;
   const [submitting, setSubmitting] = useState(false);
+
+  // Separate string states to prevent decimal point from being swallowed
+  const [doseStr, setDoseStr] = useState(
+    initialData?.dose_units != null ? String(initialData.dose_units) : "",
+  );
+  const [carbsStr, setCarbsStr] = useState(
+    initialData?.meal_carbs_grams != null ? String(initialData.meal_carbs_grams) : "",
+  );
+  const [glucoseStr, setGlucoseStr] = useState(
+    initialData?.glucose_before_mgdl != null ? String(initialData.glucose_before_mgdl) : "",
+  );
 
   const {
     control,
     handleSubmit,
     watch,
+    reset,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(createInsulinRecordSchema),
@@ -56,7 +82,13 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
       client_id: generateUUID(),
       applied_at: new Date().toISOString(),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      dose_rationale: "correction",
+      dose_rationale: initialData?.dose_rationale ?? "correction",
+      insulin_type: initialData?.insulin_type,
+      dose_units: initialData?.dose_units,
+      meal_carbs_grams: initialData?.meal_carbs_grams,
+      glucose_before_mgdl: initialData?.glucose_before_mgdl,
+      administration_site: initialData?.administration_site,
+      notes: initialData?.notes,
     },
   });
 
@@ -65,13 +97,34 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
   const onSubmit = async (data: FormValues) => {
     setSubmitting(true);
     try {
-      const result = await queueInsulinRecord(patientId, data);
-      if (result.status === "queued") {
-        Alert.alert(
-          "Salvo offline",
-          "Sem conexão. O registro será sincronizado quando você estiver online.",
-        );
+      if (isEditMode) {
+        await apiClient.patch(`/patients/${patientId}/insulin-records/${recordId}`, {
+          insulin_type: data.insulin_type,
+          dose_units: data.dose_units,
+          dose_rationale: data.dose_rationale,
+          meal_carbs_grams: data.meal_carbs_grams ?? null,
+          glucose_before_mgdl: data.glucose_before_mgdl ?? null,
+          administration_site: data.administration_site ?? null,
+          notes: data.notes ?? null,
+        });
+      } else {
+        const result = await queueInsulinRecord(patientId, data);
+        if (result.status === "queued") {
+          Alert.alert(
+            "Salvo offline",
+            "Sem conexão. O registro será sincronizado quando você estiver online.",
+          );
+        }
       }
+      reset({
+        client_id: generateUUID(),
+        applied_at: new Date().toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        dose_rationale: "correction",
+      });
+      setDoseStr("");
+      setCarbsStr("");
+      setGlucoseStr("");
       onSuccess?.();
     } catch (error) {
       Alert.alert("Erro", error instanceof Error ? error.message : "Tente novamente.");
@@ -82,7 +135,7 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Registrar Insulina</Text>
+      <Text style={styles.heading}>{isEditMode ? "Editar Insulina" : "Registrar Insulina"}</Text>
 
       {/* Insulin type */}
       <Text style={styles.label}>Tipo de insulina *</Text>
@@ -114,9 +167,11 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
             placeholder="Ex: 4"
             placeholderTextColor="#64748B"
             keyboardType="decimal-pad"
-            value={(field.value as number | undefined)?.toString() ?? ""}
+            value={doseStr}
             onChangeText={(v) => {
-              field.onChange(v ? parseFloat(v) : undefined);
+              setDoseStr(v);
+              const n = parseFloat(v);
+              field.onChange(isNaN(n) ? undefined : n);
             }}
             accessibilityLabel="Dose em unidades"
           />
@@ -166,9 +221,11 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
                 placeholder="Ex: 45"
                 placeholderTextColor="#64748B"
                 keyboardType="number-pad"
-                value={field.value?.toString() ?? ""}
+                value={carbsStr}
                 onChangeText={(v) => {
-                  field.onChange(v ? parseInt(v, 10) : undefined);
+                  setCarbsStr(v);
+                  const n = parseInt(v, 10);
+                  field.onChange(isNaN(n) ? undefined : n);
                 }}
                 accessibilityLabel="Carboidratos em gramas"
               />
@@ -191,9 +248,11 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
             placeholder="Ex: 180"
             placeholderTextColor="#64748B"
             keyboardType="number-pad"
-            value={field.value?.toString() ?? ""}
+            value={glucoseStr}
             onChangeText={(v) => {
-              field.onChange(v ? parseInt(v, 10) : undefined);
+              setGlucoseStr(v);
+              const n = parseInt(v, 10);
+              field.onChange(isNaN(n) ? undefined : n);
             }}
             accessibilityLabel="Glicemia antes da aplicação"
           />
@@ -202,6 +261,25 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
       {errors.glucose_before_mgdl && (
         <Text style={styles.error}>{errors.glucose_before_mgdl.message}</Text>
       )}
+
+      {/* Administration site */}
+      <Text style={styles.label}>Local de aplicação</Text>
+      <Controller
+        control={control}
+        name="administration_site"
+        render={({ field }) => (
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: Abdômen, braço"
+            placeholderTextColor="#64748B"
+            value={field.value ?? ""}
+            onChangeText={(v) => {
+              field.onChange(v || undefined);
+            }}
+            accessibilityLabel="Local de aplicação"
+          />
+        )}
+      />
 
       {/* Notes */}
       <Text style={styles.label}>Observações</Text>
@@ -229,13 +307,13 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
         }}
         disabled={submitting}
         accessibilityRole="button"
-        accessibilityLabel="Registrar aplicação de insulina"
+        accessibilityLabel={isEditMode ? "Salvar alterações" : "Registrar aplicação de insulina"}
         accessibilityState={{ disabled: submitting }}
       >
         {submitting ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.buttonText}>Registrar</Text>
+          <Text style={styles.buttonText}>{isEditMode ? "Salvar Alterações" : "Registrar"}</Text>
         )}
       </TouchableOpacity>
     </ScrollView>

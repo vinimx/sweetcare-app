@@ -88,6 +88,51 @@ export async function getPatientInsulinRecords(
   return { records: page, nextCursor, totalCount };
 }
 
+export interface UpdateInsulinRecordData {
+  insulinType?: string;
+  doseUnits?: number;
+  doseRationale?: "correction" | "meal_coverage" | "basal" | "combination";
+  mealCarbsGrams?: number | null;
+  glucoseBeforeMgdl?: number | null;
+  administrationSite?: string | null;
+  notes?: string | null;
+}
+
+export async function updateInsulinRecord(
+  id: string,
+  patientId: string,
+  data: UpdateInsulinRecordData,
+): Promise<InsulinApplicationRecord | null> {
+  const prisma = getPrismaClient();
+  const existing = await prisma.insulinApplicationRecord.findFirst({
+    where: { id, patientProfileId: patientId },
+  });
+  if (!existing) return null;
+
+  return prisma.insulinApplicationRecord.update({
+    where: { id },
+    data: {
+      ...(data.insulinType !== undefined && { insulinType: data.insulinType }),
+      ...(data.doseUnits !== undefined && { doseUnits: data.doseUnits }),
+      ...(data.doseRationale !== undefined && { doseRationale: data.doseRationale }),
+      ...(data.mealCarbsGrams !== undefined && { mealCarbsGrams: data.mealCarbsGrams }),
+      ...(data.glucoseBeforeMgdl !== undefined && { glucoseBeforeMgdl: data.glucoseBeforeMgdl }),
+      ...(data.administrationSite !== undefined && { administrationSite: data.administrationSite }),
+      ...(data.notes !== undefined && { notes: data.notes }),
+    },
+  });
+}
+
+export async function deleteInsulinRecord(id: string, patientId: string): Promise<boolean> {
+  const prisma = getPrismaClient();
+  const existing = await prisma.insulinApplicationRecord.findFirst({
+    where: { id, patientProfileId: patientId },
+  });
+  if (!existing) return false;
+  await prisma.insulinApplicationRecord.delete({ where: { id } });
+  return true;
+}
+
 // Used by sync batch service for overlapping-window conflict detection
 export async function findBolusRecordsInWindow(
   patientId: string,

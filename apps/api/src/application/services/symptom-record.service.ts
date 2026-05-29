@@ -3,9 +3,12 @@ import type { CreateSymptomRecordInput } from "../../domain/entities/symptom-rec
 import { validateSymptomRecord } from "../../domain/entities/symptom-record.entity.js";
 import {
   upsertSymptomRecord,
+  updateSymptomRecord as updateSymptomRecordRepo,
+  deleteSymptomRecord as deleteSymptomRecordRepo,
   getPatientSymptomRecords,
   type SymptomRecordQuery,
   type PaginatedSymptomRecords,
+  type UpdateSymptomRecordData,
 } from "../../infrastructure/repositories/symptom-record.repository.js";
 import {
   createAlertEvent,
@@ -14,7 +17,12 @@ import {
 import { evaluateAlertRules } from "../../domain/services/alert-rule-engine.js";
 import { sendAlertNotification } from "../../infrastructure/notifications/push-notification.service.js";
 import { hasActiveConsent } from "../../domain/services/caregiver-access.guard.js";
-import { auditCreate, auditAlertGenerated } from "../audit/audit.service.js";
+import {
+  auditCreate,
+  auditUpdate,
+  auditDelete,
+  auditAlertGenerated,
+} from "../audit/audit.service.js";
 import { logger } from "../../infrastructure/logging/logger.js";
 import type { CreateRecordContext } from "./insulin-record.service.js";
 
@@ -107,6 +115,69 @@ export async function createSymptomRecord(
       "Alert generation failed — symptom record committed; background retry required",
     );
     return { record, isNew, alertTriggered: false, alertId: null };
+  }
+}
+
+export async function updateSymptomRecord(
+  recordId: string,
+  patientId: string,
+  input: UpdateSymptomRecordData,
+  ctx: CreateRecordContext,
+): Promise<SymptomRecord> {
+  const consentActive = await hasActiveConsent(ctx.actorUserId, patientId);
+  if (!consentActive) {
+    const err = new Error("CONSENT_REVOKED") as Error & { statusCode: number };
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const record = await updateSymptomRecordRepo(recordId, patientId, input);
+  if (!record) {
+    const err = new Error("Record not found") as Error & { statusCode: number };
+    err.statusCode = 404;
+    throw err;
+  }
+
+  void auditUpdate({
+    actorUserId: ctx.actorUserId,
+    correlationId: ctx.correlationId,
+    targetTable: "symptom_records",
+    targetId: recordId,
+    diffSummary: { fieldsUpdated: Object.keys(input) },
+    ipAddress: ctx.ipAddress,
+    userAgent: ctx.userAgent,
+  });
+
+  return record;
+}
+
+export async function deleteSymptomRecord(
+  recordId: string,
+  patientId: string,
+  ctx: CreateRecordContext,
+): Promise<void> {
+  const consentActive = await hasActiveConsent(ctx.actorUserId, patientId);
+  if (!consentActive) {
+    const err = new Error("CONSENT_REVOKED") as Error & { statusCode: number };
+    err.statusCode = 403;
+    throw err;
+  }
+
+  void auditDelete({
+    actorUserId: ctx.actorUserId,
+    correlationId: ctx.correlationId,
+    targetTable: "symptom_records",
+    targetId: recordId,
+    diffSummary: {},
+    ipAddress: ctx.ipAddress,
+    userAgent: ctx.userAgent,
+  });
+
+  const deleted = await deleteSymptomRecordRepo(recordId, patientId);
+  if (!deleted) {
+    const err = new Error("Record not found") as Error & { statusCode: number };
+    err.statusCode = 404;
+    throw err;
   }
 }
 

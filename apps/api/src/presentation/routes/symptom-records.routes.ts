@@ -7,6 +7,8 @@ import {
 } from "../../infrastructure/auth/rbac.middleware.js";
 import {
   createSymptomRecord,
+  updateSymptomRecord,
+  deleteSymptomRecord,
   listSymptomRecords,
 } from "../../application/services/symptom-record.service.js";
 
@@ -103,6 +105,85 @@ export default async function symptomRecordsRoutes(app: FastifyInstance) {
         alert_triggered: alertTriggered,
         alert_id: alertId,
       });
+    },
+  );
+
+  // PATCH /patients/:patientId/symptoms/:recordId
+  app.patch(
+    "/patients/:patientId/symptoms/:recordId",
+    {
+      preHandler: [app.authenticate, requirePatientAccess, requireWriteAccess],
+      schema: {
+        params: z.object({ patientId: z.string().uuid(), recordId: z.string().uuid() }),
+        body: z.object({
+          symptom_codes: z.array(z.string()).min(1).optional(),
+          severity_level: z.enum(["mild", "moderate", "severe", "emergency"]).optional(),
+          glucose_reading_mgdl: z.number().int().min(20).max(600).nullable().optional(),
+          notes: z.string().max(1000).nullable().optional(),
+        }),
+        response: {
+          200: z.object({ record_id: z.string(), updated: z.literal(true) }),
+          403: errorSchema,
+          404: errorSchema,
+          422: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { patientId, recordId } = request.params as { patientId: string; recordId: string };
+      const body = request.body as {
+        symptom_codes?: string[];
+        severity_level?: "mild" | "moderate" | "severe" | "emergency";
+        glucose_reading_mgdl?: number | null;
+        notes?: string | null;
+      };
+
+      const record = await updateSymptomRecord(
+        recordId,
+        patientId,
+        {
+          symptomCodes: body.symptom_codes,
+          severityLevel: body.severity_level,
+          glucoseReadingMgdl: body.glucose_reading_mgdl,
+          notes: body.notes,
+        },
+        {
+          actorUserId: request.jwtUser.sub,
+          correlationId: request.id,
+          ipAddress: request.ip ?? "unknown",
+          userAgent: request.headers["user-agent"] ?? "unknown",
+        },
+      );
+
+      return reply.status(200).send({ record_id: record.id, updated: true });
+    },
+  );
+
+  // DELETE /patients/:patientId/symptoms/:recordId
+  app.delete(
+    "/patients/:patientId/symptoms/:recordId",
+    {
+      preHandler: [app.authenticate, requirePatientAccess, requireWriteAccess],
+      schema: {
+        params: z.object({ patientId: z.string().uuid(), recordId: z.string().uuid() }),
+        response: {
+          204: z.undefined(),
+          403: errorSchema,
+          404: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { patientId, recordId } = request.params as { patientId: string; recordId: string };
+
+      await deleteSymptomRecord(recordId, patientId, {
+        actorUserId: request.jwtUser.sub,
+        correlationId: request.id,
+        ipAddress: request.ip ?? "unknown",
+        userAgent: request.headers["user-agent"] ?? "unknown",
+      });
+
+      return reply.status(204).send();
     },
   );
 

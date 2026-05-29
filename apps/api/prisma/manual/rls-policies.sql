@@ -55,7 +55,11 @@ CREATE POLICY insulin_record_access ON insulin_application_records
 CREATE POLICY insulin_record_insert ON insulin_application_records
   FOR INSERT WITH CHECK (has_patient_access(patient_profile_id));
 
--- No UPDATE or DELETE policies → blocked by default (immutable records)
+CREATE POLICY insulin_record_update ON insulin_application_records
+  FOR UPDATE USING (has_patient_access(patient_profile_id));
+
+CREATE POLICY insulin_record_delete ON insulin_application_records
+  FOR DELETE USING (has_patient_access(patient_profile_id));
 
 -- ─────────────────────────────────────────────────────
 -- SymptomRecord
@@ -65,6 +69,12 @@ CREATE POLICY symptom_record_access ON symptom_records
 
 CREATE POLICY symptom_record_insert ON symptom_records
   FOR INSERT WITH CHECK (has_patient_access(patient_profile_id));
+
+CREATE POLICY symptom_record_update ON symptom_records
+  FOR UPDATE USING (has_patient_access(patient_profile_id));
+
+CREATE POLICY symptom_record_delete ON symptom_records
+  FOR DELETE USING (has_patient_access(patient_profile_id));
 
 -- ─────────────────────────────────────────────────────
 -- AlertEvent
@@ -114,27 +124,38 @@ CREATE POLICY audit_insert_only ON audit_entries
 
 -- ─────────────────────────────────────────────────────
 -- Immutable-record enforcement trigger
--- Prevents UPDATE/DELETE on medical records at the DB level
+-- Only audit_entries remain immutable (insulin/symptom records support full CRUD)
 -- ─────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION prevent_medical_record_mutation()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-  RAISE EXCEPTION 'Medical records are immutable — create a new record instead'
+  RAISE EXCEPTION 'Audit entries are immutable'
     USING ERRCODE = 'integrity_constraint_violation';
 END;
 $$;
 
-CREATE TRIGGER insulin_records_immutable
-  BEFORE UPDATE OR DELETE ON insulin_application_records
-  FOR EACH ROW EXECUTE FUNCTION prevent_medical_record_mutation();
-
-CREATE TRIGGER symptom_records_immutable
-  BEFORE UPDATE OR DELETE ON symptom_records
-  FOR EACH ROW EXECUTE FUNCTION prevent_medical_record_mutation();
-
 CREATE TRIGGER audit_entries_immutable
   BEFORE UPDATE OR DELETE ON audit_entries
   FOR EACH ROW EXECUTE FUNCTION prevent_medical_record_mutation();
+
+-- ─────────────────────────────────────────────────────
+-- Cascade FK constraints for clean deletes
+-- ─────────────────────────────────────────────────────
+ALTER TABLE audit_entries
+  ADD CONSTRAINT audit_insulin_fk
+  FOREIGN KEY (target_id) REFERENCES insulin_application_records(id) ON DELETE CASCADE;
+
+ALTER TABLE audit_entries
+  ADD CONSTRAINT audit_symptom_fk
+  FOREIGN KEY (target_id) REFERENCES symptom_records(id) ON DELETE CASCADE;
+
+ALTER TABLE audit_entries
+  ADD CONSTRAINT audit_alert_fk
+  FOREIGN KEY (target_id) REFERENCES alert_events(id) ON DELETE CASCADE;
+
+ALTER TABLE alert_events
+  ADD CONSTRAINT alert_events_trigger_symptom_record_id_fkey
+  FOREIGN KEY (trigger_symptom_record_id) REFERENCES symptom_records(id) ON DELETE CASCADE;
 
 -- ─────────────────────────────────────────────────────
 -- updated_at auto-update trigger (for tables that need it)
