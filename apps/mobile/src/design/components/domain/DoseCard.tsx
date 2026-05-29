@@ -14,26 +14,25 @@ const RATIONALE_LABELS: Record<string, string> = {
   combination: "Combinada",
 };
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-}
+/** Left accent bar color signals dose intent at a glance */
+const ACCENT_COLORS: Record<string, string> = {
+  meal_coverage: "#16A34A", // green — fed
+  correction: "#D97706", // amber — corrective
+  basal: "#2563EB", // blue — routine
+  combination: "#7C3AED", // violet — complex
+};
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const diff = today.getDate() - d.getDate();
-  if (diff === 0 && today.getMonth() === d.getMonth()) return "Hoje";
-  if (diff === 1 && today.getMonth() === d.getMonth()) return "Ontem";
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
 function glucoseColor(v: number, theme: ReturnType<typeof useTheme>["theme"]): string {
-  const c = theme.colors.glucose;
-  if (v < 70) return c.low;
-  if (v <= 180) return c.normal;
-  if (v <= 250) return c.high;
-  return c.critical;
+  const g = theme.colors.glucose;
+  if (v < 54) return g.critical;
+  if (v < 70) return g.low;
+  if (v <= 180) return g.normal;
+  if (v <= 250) return g.high;
+  return g.critical;
 }
 
 interface DoseCardProps {
@@ -45,101 +44,137 @@ interface DoseCardProps {
 export function DoseCard({ record, onPress, compact = false }: DoseCardProps) {
   const { theme } = useTheme();
 
+  const accentColor = ACCENT_COLORS[record.doseRationale] ?? theme.colors.primary.DEFAULT;
   const glColor =
-    record.glucoseBeforeMgdl != null
-      ? glucoseColor(record.glucoseBeforeMgdl, theme)
-      : theme.colors.text.tertiary;
+    record.glucoseBeforeMgdl != null ? glucoseColor(record.glucoseBeforeMgdl, theme) : null;
+
+  const syncLabel =
+    record.syncStatus === "pending"
+      ? "Pendente"
+      : record.syncStatus === "conflict"
+        ? "Conflito"
+        : "Sync";
 
   return (
     <Card
       variant="default"
       onPress={onPress}
       style={styles.card}
+      accentColor={accentColor}
       accessibilityLabel={`Insulina ${record.insulinType}, ${String(record.doseUnits)} U, ${RATIONALE_LABELS[record.doseRationale] ?? record.doseRationale}`}
     >
-      <View style={styles.row}>
-        <View style={[styles.iconWrap, { backgroundColor: theme.colors.primary.surface }]}>
-          <Icon
-            name="syringe"
-            family="MaterialCommunityIcons"
-            size="md"
-            color={theme.colors.primary.DEFAULT}
-          />
+      {/* Top row: icon + name/rationale + time + sync */}
+      <View style={styles.topRow}>
+        <View style={[styles.iconCircle, { backgroundColor: `${accentColor}18` }]}>
+          <Icon name="syringe" family="MaterialCommunityIcons" size="md" color={accentColor} />
         </View>
-        <View style={styles.info}>
-          <View style={styles.topRow}>
-            <Text variant="h4" numberOfLines={1} style={styles.flex}>
-              {record.insulinType}
-            </Text>
-            <Badge
-              variant="sync"
-              syncStatus={record.syncStatus}
-              label={
-                record.syncStatus === "pending"
-                  ? "Pendente"
-                  : record.syncStatus === "conflict"
-                    ? "Conflito"
-                    : "✓"
-              }
-            />
-          </View>
-          <View style={styles.detailRow}>
-            <Text variant="numeric" color={theme.colors.primary.dark}>
-              {record.doseUnits.toFixed(2)}
-            </Text>
-            <Text variant="unit" color={theme.colors.text.secondary}>
-              {" "}
-              U
-            </Text>
-            <Text variant="bodySm" color={theme.colors.text.tertiary}>
-              {" "}
-              · {RATIONALE_LABELS[record.doseRationale] ?? record.doseRationale}
-            </Text>
-            {record.mealCarbsGrams != null && (
-              <Text variant="bodySm" color={theme.colors.text.tertiary}>
-                {" "}
-                · {record.mealCarbsGrams}g
-              </Text>
-            )}
-          </View>
-          {!compact && record.glucoseBeforeMgdl != null && (
-            <View style={styles.glucoseRow}>
-              <Icon name="droplet" size="xs" color={glColor} />
-              <Text variant="bodySm" color={glColor} style={styles.glucoseText}>
-                {record.glucoseBeforeMgdl} mg/dL antes
-              </Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.timeCol}>
-          <Text variant="caption" color={theme.colors.text.tertiary}>
-            {formatDate(record.appliedAt)}
+
+        <View style={styles.nameBlock}>
+          <Text
+            variant="label"
+            numberOfLines={1}
+            style={[styles.insulinName, { color: theme.colors.text.primary }]}
+          >
+            {record.insulinType}
           </Text>
-          <Text variant="caption" color={theme.colors.text.secondary}>
+          <Text variant="caption" color={theme.colors.text.tertiary}>
+            {RATIONALE_LABELS[record.doseRationale] ?? record.doseRationale}
+          </Text>
+        </View>
+
+        <View style={styles.rightBlock}>
+          <Text variant="caption" color={theme.colors.text.tertiary}>
             {formatTime(record.appliedAt)}
           </Text>
+          <Badge variant="sync" syncStatus={record.syncStatus} label={syncLabel} size="sm" />
         </View>
       </View>
+
+      {/* Bottom row: dose value + glucose chip */}
+      <View style={styles.bottomRow}>
+        <View style={styles.doseBlock}>
+          <Text variant="numeric" color={theme.colors.text.primary}>
+            {record.doseUnits.toFixed(2)}
+          </Text>
+          <Text variant="unit" color={theme.colors.text.secondary}>
+            {" "}
+            U
+          </Text>
+          {record.mealCarbsGrams != null && (
+            <Text variant="bodySm" color={theme.colors.text.tertiary}>
+              {" · "}
+              {record.mealCarbsGrams}g carbs
+            </Text>
+          )}
+        </View>
+
+        {!compact && glColor != null && record.glucoseBeforeMgdl != null && (
+          <View
+            style={[
+              styles.glucoseChip,
+              {
+                backgroundColor: `${glColor}14`,
+                borderColor: `${glColor}28`,
+              },
+            ]}
+          >
+            <Icon name="droplet" size="xs" color={glColor} />
+            <Text variant="caption" color={glColor} style={styles.glucoseVal}>
+              {" "}
+              {record.glucoseBeforeMgdl} mg/dL
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {!compact && record.notes != null && record.notes.length > 0 && (
+        <Text
+          variant="caption"
+          color={theme.colors.text.tertiary}
+          numberOfLines={1}
+          style={styles.notes}
+        >
+          {record.notes}
+        </Text>
+      )}
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
   card: { marginBottom: 10 },
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  iconWrap: {
+  topRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 10,
+  },
+  iconCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 2,
+    flexShrink: 0,
   },
-  info: { flex: 1 },
-  topRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
-  flex: { flex: 1 },
-  detailRow: { flexDirection: "row", alignItems: "baseline", marginBottom: 4 },
-  glucoseRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  glucoseText: {},
-  timeCol: { alignItems: "flex-end", gap: 2, minWidth: 52 },
+  nameBlock: { flex: 1, justifyContent: "center", gap: 2 },
+  insulinName: { fontWeight: "600", fontSize: 15 },
+  rightBlock: { alignItems: "flex-end", gap: 4, flexShrink: 0 },
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  doseBlock: { flexDirection: "row", alignItems: "baseline" },
+  glucoseChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  glucoseVal: { fontWeight: "600" },
+  notes: { marginTop: 6 },
 });

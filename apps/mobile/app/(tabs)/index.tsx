@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   View,
   FlatList,
@@ -28,11 +28,11 @@ interface TimelineResponse {
   total_count: number;
 }
 
-const SEVERITY_COLORS: Record<string, string> = {
+const SEVERITY_ACCENT: Record<string, string> = {
   mild: "#D97706",
   moderate: "#EA580C",
   severe: "#DC2626",
-  emergency: "#7F1D1D",
+  emergency: "#DC2626",
 };
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
@@ -56,112 +56,153 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
-function SymptomCard({ record, onPress }: { record: SymptomRecord; onPress?: () => void }) {
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+/* ── SymptomCard ─────────────────────────────────────────────────── */
+function SymptomCard({ record }: { record: SymptomRecord }) {
   const { theme } = useTheme();
-  const color = SEVERITY_COLORS[record.severityLevel] ?? theme.colors.text.secondary;
-  const isEmergency = record.severityLevel === "emergency" || record.severityLevel === "severe";
+  const accentColor = SEVERITY_ACCENT[record.severityLevel] ?? theme.colors.text.secondary;
+  const isUrgent = record.severityLevel === "emergency" || record.severityLevel === "severe";
+
+  const severityLabel =
+    record.severityLevel === "mild"
+      ? "Leve"
+      : record.severityLevel === "moderate"
+        ? "Moderado"
+        : record.severityLevel === "severe"
+          ? "Grave"
+          : "Emergência";
+
   return (
-    <TouchableOpacity
+    <View
       style={[
-        styles.symptomCard,
+        styles.accentCard,
         {
-          backgroundColor: isEmergency ? "#FEF2F2" : theme.colors.surface.DEFAULT,
-          borderColor: isEmergency ? "#FECACA" : theme.colors.border.DEFAULT,
+          backgroundColor: isUrgent ? "#FEF2F2" : theme.colors.surface.DEFAULT,
+          borderColor: isUrgent ? "#FECACA" : "rgba(148,163,184,0.15)",
         },
         theme.shadows.sm,
       ]}
-      onPress={onPress}
-      activeOpacity={0.8}
-      accessibilityRole="button"
-      accessibilityLabel={`Sintomas: ${record.symptomCodes.join(", ")}, gravidade ${record.severityLevel}`}
+      accessibilityRole="none"
     >
-      <View style={styles.symptomRow}>
-        <View
-          style={[
-            styles.iconWrap,
-            { backgroundColor: isEmergency ? "#FEE2E2" : theme.colors.warning.surface },
-          ]}
-        >
-          <Icon name={isEmergency ? "alert-triangle" : "activity"} size="md" color={color} />
-        </View>
-        <View style={styles.symptomInfo}>
-          <View style={styles.topRow}>
-            <Text variant="body" style={styles.flex} numberOfLines={1}>
-              {record.symptomCodes.length} sintoma{record.symptomCodes.length !== 1 ? "s" : ""}{" "}
-              registrado{record.symptomCodes.length !== 1 ? "s" : ""}
-            </Text>
-            <Badge
-              variant="severity"
-              severity={record.severityLevel}
-              label={
-                record.severityLevel === "mild"
-                  ? "Leve"
-                  : record.severityLevel === "moderate"
-                    ? "Moderado"
-                    : record.severityLevel === "severe"
-                      ? "Grave"
-                      : "Emergência"
-              }
-            />
+      {/* Left accent */}
+      <View style={[styles.leftBar, { backgroundColor: accentColor }]} />
+
+      <View style={styles.accentContent}>
+        <View style={styles.accentTopRow}>
+          <View style={[styles.accentIcon, { backgroundColor: `${accentColor}18` }]}>
+            <Icon name={isUrgent ? "alert-triangle" : "activity"} size="md" color={accentColor} />
           </View>
-          {record.glucoseReadingMgdl != null && (
-            <View style={styles.glucoseRow}>
-              <Icon name="droplet" size="xs" color={theme.colors.text.tertiary} />
-              <Text variant="bodySm" color={theme.colors.text.secondary}>
-                {" "}
-                {record.glucoseReadingMgdl} mg/dL
-              </Text>
-            </View>
-          )}
-          <Text variant="caption" color={theme.colors.text.tertiary} style={styles.timeText}>
-            {formatTime(record.observedAt)}
-          </Text>
+
+          <View style={styles.accentNameBlock}>
+            <Text
+              variant="label"
+              style={{ fontWeight: "600", fontSize: 15, color: isUrgent ? "#991B1B" : "#0F172A" }}
+              numberOfLines={1}
+            >
+              {record.symptomCodes.length} sintoma
+              {record.symptomCodes.length !== 1 ? "s" : ""} registrado
+              {record.symptomCodes.length !== 1 ? "s" : ""}
+            </Text>
+            <Text variant="caption" color={theme.colors.text.tertiary}>
+              {formatTime(record.observedAt)}
+            </Text>
+          </View>
+
+          <Badge
+            variant="severity"
+            severity={record.severityLevel}
+            label={severityLabel}
+            size="sm"
+          />
         </View>
+
+        {record.glucoseReadingMgdl != null && (
+          <View
+            style={[
+              styles.glucoseChipSmall,
+              { backgroundColor: `${accentColor}14`, borderColor: `${accentColor}28` },
+            ]}
+          >
+            <Icon name="droplet" size="xs" color={accentColor} />
+            <Text variant="caption" color={accentColor} style={{ fontWeight: "600" }}>
+              {" "}
+              {record.glucoseReadingMgdl} mg/dL
+            </Text>
+          </View>
+        )}
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
+/* ── AlertCard ───────────────────────────────────────────────────── */
 function AlertCard({ alert, onPress }: { alert: AlertEvent; onPress?: () => void }) {
   const { theme } = useTheme();
   const isEmergency = alert.severityLevel === "emergency";
+  const isCritical = alert.severityLevel === "critical" || isEmergency;
+
+  const bg = isEmergency ? "#7F1D1D" : isCritical ? "#FEF2F2" : theme.colors.surface.DEFAULT;
+  const border = isEmergency ? "#991B1B" : isCritical ? "#FECACA" : "rgba(148,163,184,0.15)";
+  const iconColor = isEmergency ? "#fff" : "#DC2626";
+  const titleColor = isEmergency ? "#fff" : "#DC2626";
+  const subColor = isEmergency ? "#FECACA" : theme.colors.text.tertiary;
+
   return (
     <TouchableOpacity
-      style={[
-        styles.alertCard,
-        {
-          backgroundColor: isEmergency ? "#7F1D1D" : "#FEF2F2",
-          borderColor: isEmergency ? "#B91C1C" : "#FECACA",
-        },
-        theme.shadows.sm,
-      ]}
+      style={[styles.alertCard, { backgroundColor: bg, borderColor: border }, theme.shadows.sm]}
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={0.82}
       accessibilityRole="button"
       accessibilityLabel={`Alerta: ${ALERT_TYPE_LABELS[alert.alertType] ?? alert.alertType}${alert.resolvedAt ? ", resolvido" : ", ativo"}`}
     >
-      <View style={styles.alertRow}>
-        <Icon name="bell" size="md" color={isEmergency ? "#fff" : "#DC2626"} />
-        <View style={styles.alertInfo}>
-          <Text variant="body" color={isEmergency ? "#fff" : "#DC2626"} numberOfLines={1}>
-            {ALERT_TYPE_LABELS[alert.alertType] ?? alert.alertType}
-          </Text>
-          {alert.resolvedAt ? (
-            <Text variant="caption" color={isEmergency ? "#FECACA" : theme.colors.text.tertiary}>
-              Resolvido às {formatTime(alert.resolvedAt)}
-            </Text>
-          ) : (
-            <Text variant="caption" color={isEmergency ? "#FCA5A5" : "#DC2626"}>
-              Ativo — toque para ver orientações
-            </Text>
-          )}
-        </View>
-        <Icon name="chevron-right" size="sm" color={isEmergency ? "#FECACA" : "#DC2626"} />
+      <View
+        style={[
+          styles.alertIconWrap,
+          { backgroundColor: isEmergency ? "rgba(255,255,255,0.15)" : "#FEE2E2" },
+        ]}
+      >
+        <Icon name={isEmergency ? "zap" : "alert-triangle"} size="md" color={iconColor} />
       </View>
+
+      <View style={styles.alertBody}>
+        <Text
+          variant="label"
+          color={titleColor}
+          style={{ fontWeight: "600", fontSize: 15 }}
+          numberOfLines={1}
+        >
+          {ALERT_TYPE_LABELS[alert.alertType] ?? alert.alertType}
+        </Text>
+        {alert.resolvedAt ? (
+          <Text variant="caption" color={subColor}>
+            Resolvido às {formatTime(alert.resolvedAt)}
+          </Text>
+        ) : (
+          <Text variant="caption" color={subColor}>
+            {isEmergency
+              ? "Protocolo de emergência disponível"
+              : "Ativo — toque para ver orientações"}
+          </Text>
+        )}
+      </View>
+
+      <Icon
+        name="chevron-right"
+        size="sm"
+        color={isEmergency ? "rgba(255,255,255,0.6)" : "#DC2626"}
+      />
     </TouchableOpacity>
   );
 }
 
+/* ── Timeline types ──────────────────────────────────────────────── */
 type FlatItem =
   | { kind: "date-header"; date: string; key: string }
   | { kind: "insulin"; event: TimelineEvent & { type: "insulin" }; key: string }
@@ -188,6 +229,7 @@ function buildFlatList(events: TimelineEvent[]): FlatItem[] {
   return items;
 }
 
+/* ── HomeScreen ──────────────────────────────────────────────────── */
 export default function HomeScreen() {
   const { theme } = useTheme();
   const { activePatient } = useAuth();
@@ -202,10 +244,25 @@ export default function HomeScreen() {
     enabled: !!activePatient,
   });
 
+  const todayCount = useMemo(() => {
+    if (!data?.events.length) return 0;
+    const today = new Date().toDateString();
+    return data.events.filter((ev) => {
+      const iso =
+        ev.type === "insulin"
+          ? ev.data.appliedAt
+          : ev.type === "symptom"
+            ? ev.data.observedAt
+            : ev.data.createdAt;
+      return new Date(iso).toDateString() === today;
+    }).length;
+  }, [data?.events]);
+
   const onRefresh = useCallback(() => {
     void refetch();
   }, [refetch]);
 
+  /* No patient */
   if (!activePatient) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.background.DEFAULT }]}>
@@ -230,10 +287,11 @@ export default function HomeScreen() {
   }
 
   const flatItems = buildFlatList(data?.events ?? []);
+  const initials = getInitials(activePatient.fullName);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.background.DEFAULT }]}>
-      {/* Header */}
+      {/* ── Patient header ───────────────────────────── */}
       <View
         style={[
           styles.header,
@@ -243,18 +301,43 @@ export default function HomeScreen() {
           },
         ]}
       >
-        <View style={styles.headerContent}>
-          <View style={[styles.avatarCircle, { backgroundColor: theme.colors.primary.surface }]}>
-            <Icon name="heart" size="md" color={theme.colors.primary.DEFAULT} />
+        <View style={styles.headerRow}>
+          {/* Avatar */}
+          <View style={[styles.avatar, { backgroundColor: theme.colors.primary.surface }]}>
+            <Text
+              variant="label"
+              color={theme.colors.primary.DEFAULT}
+              style={{ fontWeight: "700", fontSize: 16 }}
+            >
+              {initials}
+            </Text>
           </View>
-          <View style={styles.headerInfo}>
-            <Text variant="h4" numberOfLines={1}>
+
+          {/* Patient info */}
+          <View style={styles.patientInfo}>
+            <Text variant="h4" numberOfLines={1} style={{ letterSpacing: -0.2 }}>
               {activePatient.fullName}
             </Text>
-            <Text variant="caption" color={theme.colors.text.tertiary}>
-              Diagnóstico em {activePatient.diagnosisYear}
-            </Text>
+            <View style={styles.patientMeta}>
+              <Text variant="caption" color={theme.colors.text.tertiary}>
+                T1DM · {activePatient.diagnosisYear}
+              </Text>
+              {todayCount > 0 && (
+                <>
+                  <View style={[styles.metaDot, { backgroundColor: theme.colors.text.tertiary }]} />
+                  <Text
+                    variant="caption"
+                    color={theme.colors.primary.DEFAULT}
+                    style={{ fontWeight: "600" }}
+                  >
+                    {todayCount} hoje
+                  </Text>
+                </>
+              )}
+            </View>
           </View>
+
+          {/* Add button */}
           <TouchableOpacity
             style={[styles.addBtn, { backgroundColor: theme.colors.primary.DEFAULT }]}
             onPress={() => {
@@ -263,20 +346,20 @@ export default function HomeScreen() {
             accessibilityRole="button"
             accessibilityLabel="Registrar novo evento"
           >
-            <Icon name="plus" size="md" color={theme.colors.text.inverse} />
+            <Icon name="plus" size="md" color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Timeline */}
+      {/* ── Timeline ─────────────────────────────────── */}
       {isLoading ? (
-        <View style={styles.skeletonContainer}>
+        <View style={styles.skeletons}>
           {[1, 2, 3].map((i) => (
             <Skeleton
               key={i}
               width="100%"
-              height={80}
-              borderRadius={12}
+              height={82}
+              borderRadius={16}
               style={styles.skeletonItem}
             />
           ))}
@@ -285,9 +368,7 @@ export default function HomeScreen() {
         <FlatList
           data={flatItems}
           keyExtractor={(item) => item.key}
-          contentContainerStyle={
-            flatItems.length === 0 ? styles.emptyContainer : styles.listContent
-          }
+          contentContainerStyle={flatItems.length === 0 ? styles.emptyWrap : styles.listContent}
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
@@ -299,29 +380,49 @@ export default function HomeScreen() {
             <EmptyState
               variant="noRecords"
               title="Sem registros ainda"
-              message="Registre a primeira insulina ou sintoma para começar o acompanhamento."
+              message="Registre a primeira insulina ou sintoma para iniciar o acompanhamento."
             />
           }
           renderItem={({ item }) => {
+            /* ── Date section header ───────────────── */
             if (item.kind === "date-header") {
               return (
                 <View style={styles.dateHeader}>
-                  <Text
-                    variant="caption"
-                    color={theme.colors.text.tertiary}
-                    style={styles.dateLabel}
+                  <View
+                    style={[styles.dateLine, { backgroundColor: theme.colors.border.subtle }]}
+                  />
+                  <View
+                    style={[
+                      styles.datePill,
+                      {
+                        backgroundColor: theme.colors.surface.subtle,
+                        borderColor: theme.colors.border.DEFAULT,
+                      },
+                    ]}
                   >
-                    {item.date.toUpperCase()}
-                  </Text>
+                    <Text
+                      variant="caption"
+                      color={theme.colors.text.secondary}
+                      style={styles.dateText}
+                    >
+                      {item.date}
+                    </Text>
+                  </View>
+                  <View
+                    style={[styles.dateLine, { backgroundColor: theme.colors.border.subtle }]}
+                  />
                 </View>
               );
             }
+
             if (item.kind === "insulin") {
               return <DoseCard record={item.event.data} />;
             }
+
             if (item.kind === "symptom") {
               return <SymptomCard record={item.event.data} />;
             }
+
             return (
               <AlertCard
                 alert={item.event.data}
@@ -346,51 +447,107 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: { borderBottomWidth: 1, paddingHorizontal: 16, paddingVertical: 12 },
-  headerContent: { flexDirection: "row", alignItems: "center", gap: 12 },
-  avatarCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+
+  /* Header */
+  header: {
+    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  avatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
-  headerInfo: { flex: 1 },
+  patientInfo: { flex: 1 },
+  patientMeta: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  metaDot: { width: 3, height: 3, borderRadius: 1.5 },
   addBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
-  listContent: { padding: 16, paddingBottom: 32 },
-  emptyContainer: { flex: 1 },
-  skeletonContainer: { padding: 16 },
-  skeletonItem: { marginBottom: 12 },
-  dateHeader: { marginTop: 8, marginBottom: 8 },
-  dateLabel: { letterSpacing: 0.5 },
-  symptomCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
+
+  /* List */
+  listContent: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 8 },
+  emptyWrap: { flex: 1 },
+  skeletons: { paddingHorizontal: 16, paddingTop: 12 },
+  skeletonItem: { marginBottom: 10 },
+
+  /* Date header */
+  dateHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 18,
     marginBottom: 10,
   },
-  symptomRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  iconWrap: {
+  dateLine: { flex: 1, height: 1 },
+  datePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    marginHorizontal: 10,
+  },
+  dateText: { fontWeight: "500", letterSpacing: 0.3 },
+
+  /* SymptomCard */
+  accentCard: {
+    flexDirection: "row",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 10,
+    overflow: "hidden",
+  },
+  leftBar: { width: 4 },
+  accentContent: { flex: 1, padding: 14 },
+  accentTopRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 8 },
+  accentIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 2,
+    flexShrink: 0,
   },
-  symptomInfo: { flex: 1 },
-  topRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
-  flex: { flex: 1 },
-  glucoseRow: { flexDirection: "row", alignItems: "center", marginBottom: 2 },
-  timeText: {},
-  alertCard: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
-  alertRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  alertInfo: { flex: 1 },
-  footer: { padding: 24, alignItems: "center" },
+  accentNameBlock: { flex: 1, justifyContent: "center", gap: 2 },
+  glucoseChipSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+
+  /* AlertCard */
+  alertCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 10,
+  },
+  alertIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  alertBody: { flex: 1, gap: 2 },
+
+  /* Footer */
+  footer: { paddingVertical: 24, alignItems: "center" },
 });
