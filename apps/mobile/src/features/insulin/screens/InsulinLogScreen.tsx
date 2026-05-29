@@ -13,6 +13,7 @@ import { useState } from "react";
 import { type z } from "zod";
 import { createInsulinRecordSchema } from "@sweetcare/shared-validation";
 import { queueInsulinRecord } from "../../../infrastructure/sync/offline-queue.js";
+import { generateUUID } from "../../../infrastructure/utils/uuid.js";
 
 type FormValues = z.infer<typeof createInsulinRecordSchema>;
 
@@ -52,7 +53,7 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
   } = useForm<FormValues>({
     resolver: zodResolver(createInsulinRecordSchema),
     defaultValues: {
-      client_id: crypto.randomUUID(),
+      client_id: generateUUID(),
       applied_at: new Date().toISOString(),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       dose_rationale: "correction",

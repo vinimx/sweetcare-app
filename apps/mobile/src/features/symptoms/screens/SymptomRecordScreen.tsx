@@ -12,6 +12,7 @@ import { useState, useMemo } from "react";
 import { computeMinimumSeverity } from "@sweetcare/shared-validation";
 import type { SymptomCode, SeverityLevel } from "@sweetcare/shared-types";
 import { queueSymptomRecord } from "../../../infrastructure/sync/offline-queue.js";
+import { generateUUID } from "../../../infrastructure/utils/uuid.js";
 
 const SYMPTOM_OPTIONS: { code: SymptomCode; label: string; emoji: string }[] = [
   { code: "hypoglycemia_mild", label: "Hipoglicemia leve", emoji: "🍬" },
@@ -77,7 +78,7 @@ export default function SymptomRecordScreen({ patientId, onSuccess }: Props) {
     if (!validate() || !effectiveSeverity) return;
     setSubmitting(true);
     try {
-      const clientId = crypto.randomUUID();
+      const clientId = generateUUID();
       const glucose = glucoseReading ? parseInt(glucoseReading, 10) : undefined;
 
       const result = await queueSymptomRecord(patientId, {

@@ -1052,6 +1052,28 @@ Impacto: `infra/docker/compose.dev.yml` — porta alterada para `5433:5432`; `ap
 
 _Última atualização: 2026-05-29 — Validação manual E2E + 3 bug fixes (schema, alerts serialization, data export)_
 
+### 2026-05-29 — Fix: `crypto.randomUUID()` indisponível no Hermes (RN 0.81)
+
+**Problema**: `ReferenceError: Property 'crypto' doesn't exist` ao abrir `InsulinLogScreen` e `SymptomRecordScreen` no dispositivo iOS.
+
+**Causa raiz**: `crypto` como identificador bare não existe no escopo global do Hermes — o motor JS do React Native 0.81. A Web Crypto API está presente em alguns builds como `globalThis.crypto`, mas não como `crypto` diretamente. Com `newArchEnabled: true` e Expo SDK 54, o acesso bare causa ReferenceError em tempo de execução.
+
+**Solução**: Criado `src/infrastructure/utils/uuid.ts` com `generateUUID()` — implementação pura de UUID v4 que:
+
+1. Acessa `globalThis.crypto` via cast `Record<string, unknown>` para contornar o tipo DOM que declara crypto como sempre presente
+2. Usa `Crypto.getRandomValues()` quando disponível (RN 0.74+)
+3. Faz fallback para `Math.random()` em ambientes sem suporte (suficiente para idempotência de `client_id` e `batch_id`)
+
+**Arquivos criados**: `src/infrastructure/utils/uuid.ts`
+
+**Arquivos alterados**:
+
+- `src/features/insulin/screens/InsulinLogScreen.tsx` — `crypto.randomUUID()` → `generateUUID()`
+- `src/features/symptoms/screens/SymptomRecordScreen.tsx` — `crypto.randomUUID()` → `generateUUID()`
+- `src/infrastructure/sync/sync-engine.ts` — `crypto.randomUUID()` → `generateUUID()`
+
+**Impacto**: Zero impacto nos contratos de API — `client_id` e `batch_id` continuam sendo UUIDs v4 válidos. Sem nova dependência adicionada. Lint e typecheck passando com 0 erros.
+
 ### 2026-05-29 — Diagnóstico e correções de compatibilidade Expo SDK 54 / RN 0.81
 
 #### Problema 1: Asserções de tipo desnecessárias em `process.env` (4 arquivos)

@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { tokenStorage } from "../storage/secure-storage.js";
+import { generateUUID } from "../utils/uuid.js";
 import {
   getPendingInsulinRecords,
   getPendingSymptomRecords,
@@ -40,7 +41,7 @@ export async function runSync(patientId: string): Promise<SyncResult> {
     return { committed: 0, skipped: 0, conflicts: 0 };
   }
 
-  const batchId = crypto.randomUUID();
+  const batchId = generateUUID();
   const records = [
     ...insulinPending.slice(0, BATCH_SIZE).map((r) => ({
       record_type: "insulin_application" as const,
