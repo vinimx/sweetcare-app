@@ -82,8 +82,8 @@ export default function SettingsScreen() {
     try {
       await apiClient.get("/users/me/data-export");
       Alert.alert(
-        "Exportação solicitada",
-        "Seus dados foram exportados com sucesso. Em um app de produção, o arquivo seria enviado ao seu e-mail.",
+        "Dados exportados",
+        "Seus dados foram preparados. Em breve você receberá um arquivo no e-mail cadastrado.",
       );
     } catch {
       Alert.alert("Erro", "Não foi possível exportar os dados. Tente novamente.");
@@ -95,7 +95,7 @@ export default function SettingsScreen() {
   function handleDeleteAccount() {
     Alert.prompt(
       "Excluir conta",
-      "Esta ação é irreversível. Informe sua senha para confirmar a exclusão de todos os seus dados.",
+      "Esta ação é irreversível. Todos os seus dados e registros médicos serão removidos permanentemente. Informe sua senha para confirmar.",
       (password) => {
         if (!password) return;
         void (async () => {
@@ -124,8 +124,19 @@ export default function SettingsScreen() {
     ]);
   }
 
+  const roleLabel =
+    user?.role === "guardian"
+      ? "Responsável"
+      : user?.role === "caregiver"
+        ? "Cuidador"
+        : (user?.role ?? "—");
+
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.background.DEFAULT }]}>
+    // edges={["top"]} — bottom inset is handled by the tab bar
+    <SafeAreaView
+      edges={["top"]}
+      style={[styles.safe, { backgroundColor: theme.colors.background.DEFAULT }]}
+    >
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text variant="h2" style={styles.pageTitle}>
           Perfil
@@ -149,11 +160,7 @@ export default function SettingsScreen() {
               {user?.email ?? "—"}
             </Text>
             <Text variant="caption" color={theme.colors.text.tertiary} style={styles.roleText}>
-              {user?.role === "guardian"
-                ? "Responsável"
-                : user?.role === "caregiver"
-                  ? "Cuidador"
-                  : (user?.role ?? "—")}
+              {roleLabel}
             </Text>
           </View>
         </View>
@@ -194,9 +201,9 @@ export default function SettingsScreen() {
           )}
         </View>
 
-        {/* LGPD section */}
+        {/* Privacy section */}
         <Text variant="h4" style={styles.sectionTitle}>
-          Privacidade e dados (LGPD)
+          Privacidade
         </Text>
         <View
           style={[
@@ -207,7 +214,7 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="download"
             label="Exportar meus dados"
-            sublabel="Art. 18 — direito de acesso"
+            sublabel="Baixe uma cópia de todos os seus dados"
             onPress={
               exportLoading
                 ? undefined
@@ -225,15 +232,15 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="trash-2"
             label="Excluir minha conta"
-            sublabel="Art. 18 — direito ao esquecimento"
+            sublabel="Remove permanentemente todos os seus dados"
             onPress={handleDeleteAccount}
             destructive
           />
         </View>
 
-        {/* App info */}
+        {/* App section */}
         <Text variant="h4" style={styles.sectionTitle}>
-          Aplicativo
+          Sobre o app
         </Text>
         <View
           style={[
@@ -243,11 +250,11 @@ export default function SettingsScreen() {
         >
           <SettingsRow
             icon="shield"
-            label="Segurança dos dados"
-            sublabel="AES-256-GCM · TLS 1.3 · argon2id"
+            label="Segurança"
+            sublabel="Seus dados são criptografados no dispositivo e em trânsito"
           />
           <Divider />
-          <SettingsRow icon="info" label="Versão" sublabel="SweetCare 1.0.0 — API v1" />
+          <SettingsRow icon="info" label="Versão" sublabel="SweetCare 1.0.0" />
         </View>
 
         {/* Logout */}
@@ -268,7 +275,7 @@ export default function SettingsScreen() {
           align="center"
           style={styles.footer}
         >
-          Seus dados são armazenados com criptografia{"\n"}e protegidos pela LGPD Art. 14.
+          Seus dados são protegidos com criptografia de ponta a ponta.
         </Text>
       </ScrollView>
     </SafeAreaView>

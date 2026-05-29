@@ -1052,6 +1052,18 @@ Impacto: `infra/docker/compose.dev.yml` — porta alterada para `5433:5432`; `ap
 
 _Última atualização: 2026-05-29 — Validação manual E2E + 3 bug fixes (schema, alerts serialization, data export)_
 
+### 2026-05-29 — Fix: tab bar abaixo da área visível + simplificação da tela de Perfil
+
+**Problema 1 — Tab bar fora da área visível (Início / Registrar / Insights / Perfil)**
+Causa raiz: `tabBarStyle: { height: 60 }` fixo não considerava `insets.bottom` do safe area (34 px no iPhone com home indicator). O React Navigation v7 não injeta automaticamente o safe area inset quando o `height` é sobrescrito manualmente via `tabBarStyle`.
+Solução: `useSafeAreaInsets()` importado em `(tabs)/_layout.tsx`; altura calculada dinamicamente como `56 + insets.bottom`; `paddingBottom: insets.bottom + 6`. Arquivo alterado: `app/(tabs)/_layout.tsx`.
+
+**Problema 2 — Textos jurídicos desnecessários na tela de Perfil**
+Causa raiz: sublabels "Art. 18 — direito de acesso" e "Art. 18 — direito ao esquecimento", título de seção "Privacidade e dados (LGPD)", siglas "AES-256-GCM · TLS 1.3 · argon2id" e rodapé "LGPD Art. 14" expunham jargão jurídico/técnico irrelevante para o usuário final.
+Solução: textos substituídos por linguagem de produto ("Baixe uma cópia de todos os seus dados", "Remove permanentemente todos os seus dados", "Seus dados são criptografados no dispositivo e em trânsito"). Seção renomeada para "Privacidade"; seção "Aplicativo" renomeada para "Sobre o app". Rodapé simplificado para "Seus dados são protegidos com criptografia de ponta a ponta." Arquivo alterado: `app/(tabs)/settings.tsx`.
+
+**Correção adicional em settings.tsx**: `SafeAreaView` atualizado para `edges={["top"]}` — o inset inferior já é gerenciado pelo tab bar, evitando dupla aplicação de safe area na tela de Perfil.
+
 ### 2026-05-29 — Fix: `crypto.randomUUID()` indisponível no Hermes (RN 0.81)
 
 **Problema**: `ReferenceError: Property 'crypto' doesn't exist` ao abrir `InsulinLogScreen` e `SymptomRecordScreen` no dispositivo iOS.
