@@ -222,7 +222,7 @@ model InsulinApplicationRecord {
   doseUnits           Decimal              @map("dose_units") @db.Decimal(5, 2)
   doseRationale       InsulinDoseRationale @map("dose_rationale")
   mealCarbsGrams      Int?                 @map("meal_carbs_grams")
-  glucoseBeforeMgdl   Int?                 @map("glucose_before_mgdl") // [PHI-ENCRYPTED]
+  glucoseBeforeMgdl   String?              @map("glucose_before_mgdl") // [PHI-ENCRYPTED as encrypted string]
   administrationSite  String?              @map("administration_site")
   notes               String?              // [PHI-ENCRYPTED]
   appliedAt           DateTime             @map("applied_at") @db.Timestamptz
@@ -246,7 +246,7 @@ model SymptomRecord {
   recordedByUserId    String        @map("recorded_by_user_id") @db.Uuid
   symptomCodes        String[]      @map("symptom_codes")
   severityLevel       SeverityLevel @map("severity_level")
-  glucoseReadingMgdl  Int?          @map("glucose_reading_mgdl") // [PHI-ENCRYPTED]
+  glucoseReadingMgdl  String?       @map("glucose_reading_mgdl") // [PHI-ENCRYPTED as encrypted string]
   notes               String?       // [PHI-ENCRYPTED]
   observedAt          DateTime      @map("observed_at") @db.Timestamptz
   recordedAt          DateTime      @default(now()) @map("recorded_at") @db.Timestamptz

@@ -208,7 +208,7 @@ export async function exportUserData(userId: string, ctx: AuditContext): Promise
         notes: (r.notes as string | null) ?? null,
         applied_at: r.appliedAt.toISOString(),
         timezone: r.timezone,
-        recorded_at: r.createdAt.toISOString(),
+        recorded_at: r.recordedAt.toISOString(),
       })),
       symptom_records: p.symptomRecords.map((r) => ({
         record_id: r.id,
@@ -219,7 +219,7 @@ export async function exportUserData(userId: string, ctx: AuditContext): Promise
         notes: (r.notes as string | null) ?? null,
         observed_at: r.observedAt.toISOString(),
         timezone: r.timezone,
-        recorded_at: r.createdAt.toISOString(),
+        recorded_at: r.recordedAt.toISOString(),
       })),
       alerts: p.alertEvents.map((a) => ({
         alert_id: a.id,

@@ -143,6 +143,7 @@ export default async function alertsRoutes(app: FastifyInstance) {
         guidance: guidance,
         created_at: alert.createdAt.toISOString(),
         resolved_at: alert.resolvedAt?.toISOString() ?? null,
+        resolved_by_user_id: alert.resolvedByUserId ?? null,
       });
     },
   );

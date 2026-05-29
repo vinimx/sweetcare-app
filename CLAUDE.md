@@ -389,19 +389,19 @@ sweetcare-app/
 
 ### Entidades e responsabilidades
 
-| Entidade                   | Tabela                        | Mutável                       | Campos PHI cifrados                                |
-| -------------------------- | ----------------------------- | ----------------------------- | -------------------------------------------------- |
-| `User`                     | `users`                       | Sim                           | `displayName`, `phoneE164`, `mfaSecretEnc`         |
-| `ConsentRecord`            | `consent_records`             | Não (revogação apenas)        | —                                                  |
-| `PatientProfile`           | `patient_profiles`            | Sim                           | `fullName`, `insulinTypeBasal`, `insulinTypeBolus` |
-| `CaregiverAssignment`      | `caregiver_assignments`       | Não (revogação apenas)        | —                                                  |
-| `InsulinApplicationRecord` | `insulin_application_records` | **Imutável**                  | `insulinType`, `glucoseBeforeMgdl`, `notes`        |
-| `SymptomRecord`            | `symptom_records`             | **Imutável**                  | `glucoseReadingMgdl`, `notes`                      |
-| `AlertEvent`               | `alert_events`                | Parcial (apenas `resolvedAt`) | —                                                  |
-| `SyncEvent`                | `sync_events`                 | Não                           | `conflictDetails` (app layer)                      |
-| `AuditEntry`               | `audit_entries`               | **Imutável**                  | —                                                  |
-| `InsightReport`            | `insight_reports`             | Não                           | `summaryText`, `patternFindings`                   |
-| `UserSession`              | `user_sessions`               | Parcial (revogação)           | —                                                  |
+| Entidade                   | Tabela                        | Mutável                       | Campos PHI cifrados                                   |
+| -------------------------- | ----------------------------- | ----------------------------- | ----------------------------------------------------- |
+| `User`                     | `users`                       | Sim                           | `displayName`, `phoneE164`, `mfaSecretEnc`            |
+| `ConsentRecord`            | `consent_records`             | Não (revogação apenas)        | —                                                     |
+| `PatientProfile`           | `patient_profiles`            | Sim                           | `fullName`, `insulinTypeBasal`, `insulinTypeBolus`    |
+| `CaregiverAssignment`      | `caregiver_assignments`       | Não (revogação apenas)        | —                                                     |
+| `InsulinApplicationRecord` | `insulin_application_records` | **Imutável**                  | `insulinType`, `glucoseBeforeMgdl` (String?), `notes` |
+| `SymptomRecord`            | `symptom_records`             | **Imutável**                  | `glucoseReadingMgdl` (String?), `notes`               |
+| `AlertEvent`               | `alert_events`                | Parcial (apenas `resolvedAt`) | —                                                     |
+| `SyncEvent`                | `sync_events`                 | Não                           | `conflictDetails` (app layer)                         |
+| `AuditEntry`               | `audit_entries`               | **Imutável**                  | —                                                     |
+| `InsightReport`            | `insight_reports`             | Não                           | `summaryText`, `patternFindings`                      |
+| `UserSession`              | `user_sessions`               | Parcial (revogação)           | —                                                     |
 
 ### Invariantes críticas de domínio
 
@@ -655,24 +655,24 @@ docker compose -f infra/docker/compose.dev.yml logs -f    # Logs
 
 ### `apps/api/.env`
 
-| Variável                     | Obrigatório                 | Descrição                                                    |
-| ---------------------------- | --------------------------- | ------------------------------------------------------------ |
-| `NODE_ENV`                   | Sim                         | `development` \| `test` \| `production`                      |
-| `PORT`                       | Não (padrão 3000)           | Porta HTTP                                                   |
-| `HOST`                       | Não (padrão 0.0.0.0)        | Bind host                                                    |
-| `DATABASE_URL`               | **Sim**                     | Connection string PostgreSQL                                 |
-| `DATABASE_POOL_MIN`          | Não (padrão 2)              | Conexões mínimas no pool                                     |
-| `DATABASE_POOL_MAX`          | Não (padrão 10)             | Conexões máximas no pool                                     |
-| `JWT_ACCESS_SECRET`          | **Sim**                     | Segredo JWT (mín. 32 chars)                                  |
-| `JWT_REFRESH_SECRET`         | **Sim**                     | Segredo refresh token (mín. 32 chars, diferente do access)   |
-| `JWT_ACCESS_EXPIRY_SECONDS`  | Não (padrão 900)            | Expiração do access token                                    |
-| `JWT_REFRESH_EXPIRY_SECONDS` | Não (padrão 604800)         | Expiração do refresh token                                   |
-| `PHI_ENCRYPTION_KEY`         | **Sim**                     | 64 hex chars (32 bytes) para AES-256-GCM                     |
-| `REDIS_URL`                  | **Sim**                     | Connection string Redis                                      |
-| `AI_SERVICE_URL`             | Não (padrão localhost:8000) | URL interna do AI service                                    |
-| `AI_SERVICE_TIMEOUT_MS`      | Não (padrão 30000)          | Timeout para AI service                                      |
-| `CORS_ALLOWED_ORIGINS`       | Não                         | Origens CORS separadas por vírgula                           |
-| `LOG_LEVEL`                  | Não (padrão info)           | `trace` \| `debug` \| `info` \| `warn` \| `error` \| `fatal` |
+| Variável                     | Obrigatório                 | Descrição                                                                                                                                                |
+| ---------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                   | Sim                         | `development` \| `test` \| `production`                                                                                                                  |
+| `PORT`                       | Não (padrão 3000)           | Porta HTTP                                                                                                                                               |
+| `HOST`                       | Não (padrão 0.0.0.0)        | Bind host                                                                                                                                                |
+| `DATABASE_URL`               | **Sim**                     | Connection string PostgreSQL. Em dev com PostgreSQL local na porta 5432, usar porta 5433: `postgresql://sweetcare:changeme@127.0.0.1:5433/sweetcare_dev` |
+| `DATABASE_POOL_MIN`          | Não (padrão 2)              | Conexões mínimas no pool                                                                                                                                 |
+| `DATABASE_POOL_MAX`          | Não (padrão 10)             | Conexões máximas no pool                                                                                                                                 |
+| `JWT_ACCESS_SECRET`          | **Sim**                     | Segredo JWT (mín. 32 chars)                                                                                                                              |
+| `JWT_REFRESH_SECRET`         | **Sim**                     | Segredo refresh token (mín. 32 chars, diferente do access)                                                                                               |
+| `JWT_ACCESS_EXPIRY_SECONDS`  | Não (padrão 900)            | Expiração do access token                                                                                                                                |
+| `JWT_REFRESH_EXPIRY_SECONDS` | Não (padrão 604800)         | Expiração do refresh token                                                                                                                               |
+| `PHI_ENCRYPTION_KEY`         | **Sim**                     | 64 hex chars (32 bytes) para AES-256-GCM                                                                                                                 |
+| `REDIS_URL`                  | **Sim**                     | Connection string Redis                                                                                                                                  |
+| `AI_SERVICE_URL`             | Não (padrão localhost:8000) | URL interna do AI service                                                                                                                                |
+| `AI_SERVICE_TIMEOUT_MS`      | Não (padrão 30000)          | Timeout para AI service                                                                                                                                  |
+| `CORS_ALLOWED_ORIGINS`       | Não                         | Origens CORS separadas por vírgula                                                                                                                       |
+| `LOG_LEVEL`                  | Não (padrão info)           | `trace` \| `debug` \| `info` \| `warn` \| `error` \| `fatal`                                                                                             |
 
 > ⚠️ `PHI_ENCRYPTION_KEY`: perda desta chave = perda permanente de todos os dados PHI cifrados.
 > Em produção, use AWS Secrets Manager ou HashiCorp Vault com rotação documentada.
@@ -1032,4 +1032,22 @@ Impacto: `auth.routes.ts` expõe `GET /users/me` protegido por Bearer; `AuthCont
 Motivação: O fluxo de onboarding do mobile necessita tokens imediatamente após o registro para navegar para o app sem uma segunda chamada de login. O service `register()` só cria o usuário — o handler agora chama `login()` internamente e retorna o payload completo.
 Impacto: `auth.routes.ts`; response de `POST /auth/register` mudou de `{ userId }` para `authResponseSchema` (mesmo formato do login).
 
-_Última atualização: 2026-05-28 — Correção de contrato API↔Mobile + TypeScript fixes (mobile e API)_
+### 2026-05-29 — Bugs encontrados em validação manual end-to-end
+
+**Fix: `glucoseBeforeMgdl` e `glucoseReadingMgdl` mudados de `Int?` para `String?` no schema Prisma**
+Motivação: O middleware PHI cifra esses campos com AES-256-GCM, convertendo-os para strings. O schema original tinha `Int?`, o que causava erro `P2019` do Prisma ao tentar escrever a string cifrada num campo inteiro.
+Impacto: `schema.prisma` — duas colunas alteradas para `String?`; `ALTER TABLE ... ALTER COLUMN ... TYPE TEXT` aplicado no banco via `docker exec psql`; `PHI_INT_FIELDS` no encryption-middleware já fazia o encode/decode correto; no data export via `include` nested, o middleware não descriptografa automaticamente (limitação do `$extends` com queries aninhadas) — glucose aparece como `null` no export LGPD, não como inteiro. Workaround futuro: queries separadas em vez de `include` nested no `exportUserData`.
+
+**Fix: `GET /alerts/:alertId` retornava 500 `FST_ERR_RESPONSE_SERIALIZATION`**
+Motivação: O `alertDetailSchema` exige `resolved_by_user_id: z.string().uuid().nullable()` mas o handler não incluía esse campo na resposta, causando falha de serialização do Zod.
+Impacto: `alerts.routes.ts` — campo `resolved_by_user_id` adicionado ao response object.
+
+**Fix: `data-rights.service.ts` usava `r.createdAt` em vez de `r.recordedAt`**
+Motivação: `InsulinApplicationRecord` e `SymptomRecord` expõem o campo como `recordedAt` (não `createdAt`). A chamada a `undefined.toISOString()` lançava 500 no endpoint `GET /users/me/data-export`.
+Impacto: `data-rights.service.ts` — duas ocorrências corrigidas.
+
+**Fix de ambiente: PostgreSQL 18 local conflitava com container Docker na porta 5432**
+Motivação: O Prisma Rust engine conectava ao PostgreSQL 18 local (sem o banco `sweetcare_dev`), não ao container. Erro P1000 "Authentication failed" mesmo com `trust` no pg_hba.conf do container.
+Impacto: `infra/docker/compose.dev.yml` — porta alterada para `5433:5432`; `apps/api/.env` — `DATABASE_URL` atualizado para porta 5433 e host `127.0.0.1` (não `localhost`). Developers com PostgreSQL local devem usar a porta 5433.
+
+_Última atualização: 2026-05-29 — Validação manual E2E + 3 bug fixes (schema, alerts serialization, data export)_
