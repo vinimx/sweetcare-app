@@ -193,6 +193,7 @@ export default function SymptomRecordScreen({ patientId, onSuccess }: Props) {
       <TextInput
         style={[styles.input, errors["glucose"] && styles.inputError]}
         placeholder="Ex: 65"
+        placeholderTextColor="#64748B"
         keyboardType="number-pad"
         value={glucoseReading}
         onChangeText={setGlucoseReading}
@@ -205,6 +206,7 @@ export default function SymptomRecordScreen({ patientId, onSuccess }: Props) {
       <TextInput
         style={[styles.input, styles.textArea]}
         placeholder="Observações opcionais"
+        placeholderTextColor="#64748B"
         multiline
         numberOfLines={3}
         value={notes}

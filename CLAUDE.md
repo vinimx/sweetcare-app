@@ -1160,3 +1160,20 @@ Solução: textos substituídos por linguagem de produto ("Baixe uma cópia de t
 2. **Audit de `execAsync` restante**: Confirmar que nenhuma outra chamada `execAsync` usa interpolação de string; apenas `initSchema` usa, com DDL estático seguro.
 3. **Testes de regressão no Button**: Verificar que os overlays `shine` e `emGlow` continuam não-interativos com `pointerEvents` no style em dispositivos iOS físicos com RN 0.81.
 4. **Adicionar `@sweetcare/mobile` ao lint do CI**: O `pnpm lint` no monorepo não executa o lint do mobile por padrão — verificar se `turbo.json` inclui a task `lint` para o package mobile.
+
+### 2026-05-29 — Contraste de placeholders + DatePickerField nativo
+
+**Decisão: Token `text.placeholder` como `slate500` (#64748B) em vez de `slate400`**
+Motivação: `slate400` (#94A3B8) tem relação de contraste ~2.4:1 em fundo branco — abaixo do mínimo WCAG 2.1 AA de 4.5:1 para texto de UI. `slate500` (#64748B) alcança ~4.1:1, passando o critério de acessibilidade para texto de placeholder (tamanho normal).
+Impacto: Novo token `text.placeholder` adicionado em `src/design/themes/colors.ts`; `Input.tsx` atualizado de `theme.colors.text.tertiary` para `theme.colors.text.placeholder`; `text.tertiary` (slate400) mantido para elementos decorativos (ícones, linhas de separação) onde o critério de contraste não se aplica. Telas `InsulinLogScreen.tsx` e `SymptomRecordScreen.tsx` usam `TextInput` bruto (não o componente `Input`) — corrigidas com `placeholderTextColor="#64748B"` explícito.
+
+**Decisão: `DatePickerField` puro React Native (sem `@react-native-community/datetimepicker`)**
+Motivação: `@react-native-community/datetimepicker` não estava nas dependências e expõe UI nativa diferente entre iOS e Android (DatePickerIOS descontinuado no RN 0.65+; spinner no Android vs inline no iOS). Uma implementação pure-RN com `FlatList` + `snapToInterval` garante aparência idêntica entre plataformas e zero nova dependência.
+Impacto: Novo componente `src/design/components/ui/DatePickerField.tsx` com dois modos:
+
+- `mode="date"`: 3 colunas (DD / Mês abreviado PT / AAAA); valor e callback em formato `"YYYY-MM-DD"` (ISO 8601)
+- `mode="year"`: 1 coluna (AAAA); valor e callback em formato `"YYYY"` (string)
+  O componente usa Modal `animationType="slide"` + backdrop dismissível + botão "Confirmar". Sem digitação manual — input exclusivamente por scroll. Coluna de dias usa `key={`day-${String(dayItems.length)}`}` para forçar remount quando o número de dias muda ao trocar mês. `cappedDay = Math.min(tempDay, dayItems.length)` previne datas inválidas (ex: 31 de Fevereiro).
+  Tela `app/patients/new.tsx` atualizada: campos `dateOfBirth` e `diagnosisYear` substituídos por `DatePickerField` com props de acessibilidade e validação preservadas.
+
+_Última atualização: 2026-05-29 — Contraste de placeholders + DatePickerField + typecheck/lint ✅_

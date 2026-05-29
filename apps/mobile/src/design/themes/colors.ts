@@ -144,6 +144,7 @@ export const colors = {
     primary: palette.slate900,
     secondary: palette.slate600,
     tertiary: palette.slate400,
+    placeholder: palette.slate500,
     disabled: palette.slate300,
     inverse: palette.white,
     link: palette.blue600,

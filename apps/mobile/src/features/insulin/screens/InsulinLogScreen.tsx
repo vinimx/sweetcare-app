@@ -93,6 +93,7 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
           <TextInput
             style={[styles.input, errors.insulin_type && styles.inputError]}
             placeholder="Ex: NovoLog, Lantus"
+            placeholderTextColor="#64748B"
             value={field.value}
             onChangeText={field.onChange}
             accessibilityLabel="Tipo de insulina"
@@ -111,6 +112,7 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
           <TextInput
             style={[styles.input, errors.dose_units && styles.inputError]}
             placeholder="Ex: 4"
+            placeholderTextColor="#64748B"
             keyboardType="decimal-pad"
             value={(field.value as number | undefined)?.toString() ?? ""}
             onChangeText={(v) => {
@@ -162,6 +164,7 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
               <TextInput
                 style={[styles.input, errors.meal_carbs_grams && styles.inputError]}
                 placeholder="Ex: 45"
+                placeholderTextColor="#64748B"
                 keyboardType="number-pad"
                 value={field.value?.toString() ?? ""}
                 onChangeText={(v) => {
@@ -186,6 +189,7 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
           <TextInput
             style={[styles.input, errors.glucose_before_mgdl && styles.inputError]}
             placeholder="Ex: 180"
+            placeholderTextColor="#64748B"
             keyboardType="number-pad"
             value={field.value?.toString() ?? ""}
             onChangeText={(v) => {
@@ -208,6 +212,7 @@ export default function InsulinLogScreen({ patientId, onSuccess }: Props) {
           <TextInput
             style={[styles.input, styles.textArea]}
             placeholder="Observações opcionais"
+            placeholderTextColor="#64748B"
             multiline
             numberOfLines={3}
             value={field.value ?? ""}

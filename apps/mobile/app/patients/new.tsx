@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "../../src/design/components/ui/Text.js";
 import { Button } from "../../src/design/components/ui/Button.js";
 import { Input } from "../../src/design/components/ui/Input.js";
+import { DatePickerField } from "../../src/design/components/ui/DatePickerField.js";
 import { Icon } from "../../src/design/components/ui/Icon.js";
 import { Divider } from "../../src/design/components/ui/Divider.js";
 import { useTheme } from "../../src/design/contexts/ThemeContext.js";
@@ -40,13 +41,15 @@ interface FieldErrors {
   targetMax?: string;
 }
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 function validate(f: FormState): FieldErrors {
   const errs: FieldErrors = {};
   if (!f.fullName.trim()) errs.fullName = "Nome é obrigatório";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.dateOfBirth)) errs.dateOfBirth = "Use o formato AAAA-MM-DD";
+  if (!f.dateOfBirth) errs.dateOfBirth = "Selecione a data de nascimento";
   const year = parseInt(f.diagnosisYear, 10);
-  if (isNaN(year) || year < 1900 || year > new Date().getFullYear())
-    errs.diagnosisYear = "Ano inválido";
+  if (!f.diagnosisYear || isNaN(year) || year < 1900 || year > CURRENT_YEAR)
+    errs.diagnosisYear = "Selecione o ano do diagnóstico";
   const min = parseInt(f.targetMin, 10);
   const max = parseInt(f.targetMax, 10);
   if (isNaN(min) || min < 40 || min > 100) errs.targetMin = "Entre 40 e 100 mg/dL";
@@ -147,23 +150,24 @@ export default function NewPatientScreen() {
               accessibilityLabel="Nome completo do paciente"
               leftElement={<Icon name="user" size="sm" color={theme.colors.text.tertiary} />}
             />
-            <Input
+            <DatePickerField
               label="Data de nascimento *"
-              placeholder="AAAA-MM-DD"
               value={form.dateOfBirth}
-              onChangeText={set("dateOfBirth")}
-              keyboardType="numbers-and-punctuation"
+              onChange={set("dateOfBirth")}
+              mode="date"
+              minimumYear={1920}
+              maximumYear={CURRENT_YEAR}
               error={errors.dateOfBirth}
-              accessibilityLabel="Data de nascimento no formato ano mês dia"
-              hint="Formato: 2018-06-15"
+              accessibilityLabel="Data de nascimento do paciente"
               leftElement={<Icon name="calendar" size="sm" color={theme.colors.text.tertiary} />}
             />
-            <Input
+            <DatePickerField
               label="Ano do diagnóstico *"
-              placeholder={String(new Date().getFullYear())}
               value={form.diagnosisYear}
-              onChangeText={set("diagnosisYear")}
-              keyboardType="number-pad"
+              onChange={set("diagnosisYear")}
+              mode="year"
+              minimumYear={1950}
+              maximumYear={CURRENT_YEAR}
               error={errors.diagnosisYear}
               accessibilityLabel="Ano do diagnóstico de diabetes tipo 1"
               leftElement={<Icon name="activity" size="sm" color={theme.colors.text.tertiary} />}

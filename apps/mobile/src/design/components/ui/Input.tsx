@@ -68,7 +68,7 @@ export const Input = React.forwardRef<TextInput, InputProps>(function Input(
         <TextInput
           ref={ref}
           style={[styles.input, { color: theme.colors.text.primary }, style]}
-          placeholderTextColor={theme.colors.text.tertiary}
+          placeholderTextColor={theme.colors.text.placeholder}
           onFocus={() => {
             setFocused(true);
           }}
