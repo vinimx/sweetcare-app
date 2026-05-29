@@ -20,12 +20,67 @@ import { DoseCard } from "../../src/design/components/domain/DoseCard.js";
 import { useTheme } from "../../src/design/contexts/ThemeContext.js";
 import { useAuth } from "../../src/infrastructure/auth/AuthContext.js";
 import { apiClient } from "../../src/infrastructure/api/client.js";
-import type { TimelineEvent, SymptomRecord, AlertEvent } from "@sweetcare/shared-types";
+import type {
+  InsulinApplicationRecord,
+  InsulinDoseRationale,
+  SeverityLevel,
+} from "@sweetcare/shared-types";
+
+/* ── Local API response types (snake_case — actual API contract) ─── */
+interface ApiInsulinData {
+  record_id: string;
+  client_id: string;
+  insulin_type: string;
+  dose_units: number;
+  dose_rationale: InsulinDoseRationale;
+  meal_carbs_grams: number | null;
+  glucose_before_mgdl: number | null;
+  administration_site: string | null;
+  notes: string | null;
+  applied_at: string;
+  timezone: string;
+}
+
+interface ApiSymptomData {
+  record_id: string;
+  client_id: string;
+  symptom_codes: string[];
+  severity_level: SeverityLevel;
+  glucose_reading_mgdl: number | null;
+  notes: string | null;
+  observed_at: string;
+  timezone: string;
+}
+
+type ApiInsulinEvent = { type: "insulin"; event_time: string; data: ApiInsulinData };
+type ApiSymptomEvent = { type: "symptom"; event_time: string; data: ApiSymptomData };
+type ApiTimelineEvent = ApiInsulinEvent | ApiSymptomEvent;
 
 interface TimelineResponse {
-  events: TimelineEvent[];
+  events: ApiTimelineEvent[];
   next_cursor: string | null;
   total_count: number;
+}
+
+/* ── Adapt snake_case API data → DoseCard's InsulinApplicationRecord ─ */
+function toInsulinRecord(d: ApiInsulinData): InsulinApplicationRecord {
+  return {
+    id: d.record_id,
+    clientId: d.client_id,
+    patientProfileId: "",
+    recordedByUserId: "",
+    insulinType: d.insulin_type,
+    doseUnits: d.dose_units,
+    doseRationale: d.dose_rationale,
+    mealCarbsGrams: d.meal_carbs_grams,
+    glucoseBeforeMgdl: d.glucose_before_mgdl,
+    administrationSite: d.administration_site,
+    notes: d.notes,
+    appliedAt: d.applied_at,
+    recordedAt: d.applied_at,
+    syncStatus: "synced",
+    timezone: d.timezone,
+  };
 }
 
 const SEVERITY_ACCENT: Record<string, string> = {
@@ -33,13 +88,6 @@ const SEVERITY_ACCENT: Record<string, string> = {
   moderate: "#EA580C",
   severe: "#DC2626",
   emergency: "#DC2626",
-};
-
-const ALERT_TYPE_LABELS: Record<string, string> = {
-  hypoglycemia_risk: "Risco de Hipoglicemia",
-  severe_hypoglycemia: "Hipoglicemia Grave",
-  ketoacidosis_risk: "Risco de Cetoacidose",
-  emergency_response_required: "Emergência",
 };
 
 function formatSectionDate(iso: string): string {
@@ -65,17 +113,17 @@ function getInitials(name: string): string {
 }
 
 /* ── SymptomCard ─────────────────────────────────────────────────── */
-function SymptomCard({ record }: { record: SymptomRecord }) {
+function SymptomCard({ record }: { record: ApiSymptomData }) {
   const { theme } = useTheme();
-  const accentColor = SEVERITY_ACCENT[record.severityLevel] ?? theme.colors.text.secondary;
-  const isUrgent = record.severityLevel === "emergency" || record.severityLevel === "severe";
+  const accentColor = SEVERITY_ACCENT[record.severity_level] ?? theme.colors.text.secondary;
+  const isUrgent = record.severity_level === "emergency" || record.severity_level === "severe";
 
   const severityLabel =
-    record.severityLevel === "mild"
+    record.severity_level === "mild"
       ? "Leve"
-      : record.severityLevel === "moderate"
+      : record.severity_level === "moderate"
         ? "Moderado"
-        : record.severityLevel === "severe"
+        : record.severity_level === "severe"
           ? "Grave"
           : "Emergência";
 
@@ -106,24 +154,24 @@ function SymptomCard({ record }: { record: SymptomRecord }) {
               style={{ fontWeight: "600", fontSize: 15, color: isUrgent ? "#991B1B" : "#0F172A" }}
               numberOfLines={1}
             >
-              {record.symptomCodes.length} sintoma
-              {record.symptomCodes.length !== 1 ? "s" : ""} registrado
-              {record.symptomCodes.length !== 1 ? "s" : ""}
+              {record.symptom_codes.length} sintoma
+              {record.symptom_codes.length !== 1 ? "s" : ""} registrado
+              {record.symptom_codes.length !== 1 ? "s" : ""}
             </Text>
             <Text variant="caption" color={theme.colors.text.tertiary}>
-              {formatTime(record.observedAt)}
+              {formatTime(record.observed_at)}
             </Text>
           </View>
 
           <Badge
             variant="severity"
-            severity={record.severityLevel}
+            severity={record.severity_level}
             label={severityLabel}
             size="sm"
           />
         </View>
 
-        {record.glucoseReadingMgdl != null && (
+        {record.glucose_reading_mgdl != null && (
           <View
             style={[
               styles.glucoseChipSmall,
@@ -133,7 +181,7 @@ function SymptomCard({ record }: { record: SymptomRecord }) {
             <Icon name="droplet" size="xs" color={accentColor} />
             <Text variant="caption" color={accentColor} style={{ fontWeight: "600" }}>
               {" "}
-              {record.glucoseReadingMgdl} mg/dL
+              {record.glucose_reading_mgdl} mg/dL
             </Text>
           </View>
         )}
@@ -142,89 +190,27 @@ function SymptomCard({ record }: { record: SymptomRecord }) {
   );
 }
 
-/* ── AlertCard ───────────────────────────────────────────────────── */
-function AlertCard({ alert, onPress }: { alert: AlertEvent; onPress?: () => void }) {
-  const { theme } = useTheme();
-  const isEmergency = alert.severityLevel === "emergency";
-  const isCritical = alert.severityLevel === "critical" || isEmergency;
-
-  const bg = isEmergency ? "#7F1D1D" : isCritical ? "#FEF2F2" : theme.colors.surface.DEFAULT;
-  const border = isEmergency ? "#991B1B" : isCritical ? "#FECACA" : "rgba(148,163,184,0.15)";
-  const iconColor = isEmergency ? "#fff" : "#DC2626";
-  const titleColor = isEmergency ? "#fff" : "#DC2626";
-  const subColor = isEmergency ? "#FECACA" : theme.colors.text.tertiary;
-
-  return (
-    <TouchableOpacity
-      style={[styles.alertCard, { backgroundColor: bg, borderColor: border }, theme.shadows.sm]}
-      onPress={onPress}
-      activeOpacity={0.82}
-      accessibilityRole="button"
-      accessibilityLabel={`Alerta: ${ALERT_TYPE_LABELS[alert.alertType] ?? alert.alertType}${alert.resolvedAt ? ", resolvido" : ", ativo"}`}
-    >
-      <View
-        style={[
-          styles.alertIconWrap,
-          { backgroundColor: isEmergency ? "rgba(255,255,255,0.15)" : "#FEE2E2" },
-        ]}
-      >
-        <Icon name={isEmergency ? "zap" : "alert-triangle"} size="md" color={iconColor} />
-      </View>
-
-      <View style={styles.alertBody}>
-        <Text
-          variant="label"
-          color={titleColor}
-          style={{ fontWeight: "600", fontSize: 15 }}
-          numberOfLines={1}
-        >
-          {ALERT_TYPE_LABELS[alert.alertType] ?? alert.alertType}
-        </Text>
-        {alert.resolvedAt ? (
-          <Text variant="caption" color={subColor}>
-            Resolvido às {formatTime(alert.resolvedAt)}
-          </Text>
-        ) : (
-          <Text variant="caption" color={subColor}>
-            {isEmergency
-              ? "Protocolo de emergência disponível"
-              : "Ativo — toque para ver orientações"}
-          </Text>
-        )}
-      </View>
-
-      <Icon
-        name="chevron-right"
-        size="sm"
-        color={isEmergency ? "rgba(255,255,255,0.6)" : "#DC2626"}
-      />
-    </TouchableOpacity>
-  );
-}
-
 /* ── Timeline types ──────────────────────────────────────────────── */
 type FlatItem =
   | { kind: "date-header"; date: string; key: string }
-  | { kind: "insulin"; event: TimelineEvent & { type: "insulin" }; key: string }
-  | { kind: "symptom"; event: TimelineEvent & { type: "symptom" }; key: string }
-  | { kind: "alert"; event: TimelineEvent & { type: "alert" }; key: string };
+  | { kind: "insulin"; event: ApiInsulinEvent; key: string }
+  | { kind: "symptom"; event: ApiSymptomEvent; key: string };
 
-function buildFlatList(events: TimelineEvent[]): FlatItem[] {
+function buildFlatList(events: ApiTimelineEvent[]): FlatItem[] {
   const items: FlatItem[] = [];
   let lastDate = "";
   for (const event of events) {
-    const iso =
-      event.type === "insulin"
-        ? event.data.appliedAt
-        : event.type === "symptom"
-          ? event.data.observedAt
-          : event.data.createdAt;
+    const iso = event.type === "insulin" ? event.data.applied_at : event.data.observed_at;
     const dateLabel = formatSectionDate(iso);
     if (dateLabel !== lastDate) {
       lastDate = dateLabel;
       items.push({ kind: "date-header", date: dateLabel, key: `date-${iso}` });
     }
-    items.push({ kind: event.type, event: event as never, key: `${event.type}-${event.data.id}` });
+    if (event.type === "insulin") {
+      items.push({ kind: "insulin", event, key: `insulin-${event.data.record_id}` });
+    } else {
+      items.push({ kind: "symptom", event, key: `symptom-${event.data.record_id}` });
+    }
   }
   return items;
 }
@@ -248,12 +234,7 @@ export default function HomeScreen() {
     if (!data?.events.length) return 0;
     const today = new Date().toDateString();
     return data.events.filter((ev) => {
-      const iso =
-        ev.type === "insulin"
-          ? ev.data.appliedAt
-          : ev.type === "symptom"
-            ? ev.data.observedAt
-            : ev.data.createdAt;
+      const iso = ev.type === "insulin" ? ev.data.applied_at : ev.data.observed_at;
       return new Date(iso).toDateString() === today;
     }).length;
   }, [data?.events]);
@@ -416,21 +397,10 @@ export default function HomeScreen() {
             }
 
             if (item.kind === "insulin") {
-              return <DoseCard record={item.event.data} />;
+              return <DoseCard record={toInsulinRecord(item.event.data)} />;
             }
 
-            if (item.kind === "symptom") {
-              return <SymptomCard record={item.event.data} />;
-            }
-
-            return (
-              <AlertCard
-                alert={item.event.data}
-                onPress={() => {
-                  router.push(`/alerts/${item.event.data.id}`);
-                }}
-              />
-            );
+            return <SymptomCard record={item.event.data} />;
           }}
           ListFooterComponent={
             data && data.total_count > data.events.length ? (
@@ -527,26 +497,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
   },
-
-  /* AlertCard */
-  alertCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 10,
-  },
-  alertIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  alertBody: { flex: 1, gap: 2 },
 
   /* Footer */
   footer: { paddingVertical: 24, alignItems: "center" },

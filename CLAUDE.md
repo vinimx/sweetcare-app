@@ -1050,7 +1050,14 @@ Impacto: `data-rights.service.ts` — duas ocorrências corrigidas.
 Motivação: O Prisma Rust engine conectava ao PostgreSQL 18 local (sem o banco `sweetcare_dev`), não ao container. Erro P1000 "Authentication failed" mesmo com `trust` no pg_hba.conf do container.
 Impacto: `infra/docker/compose.dev.yml` — porta alterada para `5433:5432`; `apps/api/.env` — `DATABASE_URL` atualizado para porta 5433 e host `127.0.0.1` (não `localhost`). Developers com PostgreSQL local devem usar a porta 5433.
 
-_Última atualização: 2026-05-29 — Validação manual E2E + 3 bug fixes (schema, alerts serialization, data export)_
+### 2026-05-29 — Fix: API snake_case vs shared-types camelCase mismatch na timeline mobile
+
+**Decisão: Tipos locais de resposta da API em vez de transformação no cliente HTTP**
+Motivação: O `apiClient` retorna o JSON bruto da API (snake_case) sem transformação de casing. Os `shared-types` usam camelCase por serem agnósticos ao transporte. A tela `app/(tabs)/index.tsx` usava `TimelineEvent` dos shared-types diretamente, causando acesso a campos `undefined` (`event.data.id` em vez de `event.data.record_id`, `appliedAt` em vez de `applied_at`) e o warning `Encountered two children with the same key, 'symptom-undefined'`.
+Solução: Definir tipos locais `ApiInsulinData`/`ApiSymptomData` na tela que espelham exatamente o contrato snake_case da API; adaptar para `InsulinApplicationRecord` via função `toInsulinRecord()` antes de passar ao `DoseCard` (que continua usando shared-types). Alertas removidos do FlatItem pois o endpoint `/timeline` nunca os retorna.
+Impacto: `app/(tabs)/index.tsx`; sem mudança em `apiClient` (zero transformação é a política); qualquer nova tela que consume a API deve seguir o mesmo padrão de tipos locais + mapper.
+
+_Última atualização: 2026-05-29 — Fix timeline snake_case/camelCase + symptom-undefined key_
 
 ### 2026-05-29 — Fix: tab bar abaixo da área visível + simplificação da tela de Perfil
 
