@@ -223,8 +223,12 @@ export async function countPendingRecords(patientId: string): Promise<number> {
 
 export async function clearSyncedRecords(patientId: string): Promise<void> {
   const db = await getOfflineDb();
-  await db.execAsync(`
-    DELETE FROM offline_insulin_records WHERE patient_id = '${patientId}' AND sync_status = 'synced';
-    DELETE FROM offline_symptom_records WHERE patient_id = '${patientId}' AND sync_status = 'synced';
-  `);
+  await db.runAsync(
+    `DELETE FROM offline_insulin_records WHERE patient_id = ? AND sync_status = 'synced'`,
+    [patientId],
+  );
+  await db.runAsync(
+    `DELETE FROM offline_symptom_records WHERE patient_id = ? AND sync_status = 'synced'`,
+    [patientId],
+  );
 }

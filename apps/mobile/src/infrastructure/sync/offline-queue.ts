@@ -3,8 +3,7 @@ import { saveOfflineInsulinRecord, saveOfflineSymptomRecord } from "../storage/o
 import type { CreateInsulinRecordInput } from "@sweetcare/shared-validation";
 import type { CreateSymptomRecordInput } from "@sweetcare/shared-validation";
 
-const API_BASE =
-  (process.env["EXPO_PUBLIC_API_URL"] as string | undefined) ?? "http://localhost:3000/api/v1";
+const API_BASE = process.env["EXPO_PUBLIC_API_URL"] ?? "http://localhost:3000/api/v1";
 
 export type QueueResult =
   | { status: "synced"; recordId: string }

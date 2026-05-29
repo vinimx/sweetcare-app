@@ -32,7 +32,7 @@ function DotGrid() {
   });
 
   return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFillObject, { pointerEvents: "none" }]}>
       {dots.map((d, i) => (
         <View
           key={i}

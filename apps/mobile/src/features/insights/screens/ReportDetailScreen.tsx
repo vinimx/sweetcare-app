@@ -9,8 +9,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { tokenStorage } from "../../../infrastructure/storage/secure-storage.js";
 
-const API_BASE =
-  (process.env["EXPO_PUBLIC_API_URL"] as string | undefined) ?? "http://localhost:3000/api/v1";
+const API_BASE = process.env["EXPO_PUBLIC_API_URL"] ?? "http://localhost:3000/api/v1";
 
 const CONFIDENCE_COLORS: Record<string, string> = {
   low: "#DC2626",

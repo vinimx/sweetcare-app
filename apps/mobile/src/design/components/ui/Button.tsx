@@ -167,7 +167,7 @@ export function Button({
         ]}
       >
         {/* Top-shine on filled buttons */}
-        {VC.shine && !isDisabled && <View style={styles.shine} pointerEvents="none" />}
+        {VC.shine && !isDisabled && <View style={styles.shine} />}
 
         {loading ? (
           <ActivityIndicator color={VC.fg} size="small" />
@@ -187,10 +187,7 @@ export function Button({
 
         {/* Emergency breathing pulse overlay */}
         {variant === "emergency" && !isDisabled && (
-          <Animated.View
-            style={[styles.emGlow, { opacity: emergencyPulse }]}
-            pointerEvents="none"
-          />
+          <Animated.View style={[styles.emGlow, { opacity: emergencyPulse }]} />
         )}
       </Pressable>
     </Animated.View>
@@ -224,9 +221,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.11)",
     borderTopLeftRadius: 13,
     borderTopRightRadius: 13,
+    pointerEvents: "none",
   },
   emGlow: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(255,255,255,0.13)",
+    pointerEvents: "none",
   },
 });

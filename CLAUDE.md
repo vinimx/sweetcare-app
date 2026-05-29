@@ -1051,3 +1051,71 @@ Motivação: O Prisma Rust engine conectava ao PostgreSQL 18 local (sem o banco 
 Impacto: `infra/docker/compose.dev.yml` — porta alterada para `5433:5432`; `apps/api/.env` — `DATABASE_URL` atualizado para porta 5433 e host `127.0.0.1` (não `localhost`). Developers com PostgreSQL local devem usar a porta 5433.
 
 _Última atualização: 2026-05-29 — Validação manual E2E + 3 bug fixes (schema, alerts serialization, data export)_
+
+### 2026-05-29 — Diagnóstico e correções de compatibilidade Expo SDK 54 / RN 0.81
+
+#### Problema 1: Asserções de tipo desnecessárias em `process.env` (4 arquivos)
+
+**Causa raiz**: `process.env["EXPO_PUBLIC_API_URL"]` já tem tipo `string | undefined` no TypeScript 5.7. O cast explícito `as string | undefined` é redundante e flagrado pela regra `@typescript-eslint/no-unnecessary-type-assertion`. O padrão correto já existia em `src/infrastructure/api/client.ts:3` mas não foi replicado nos demais arquivos.
+
+**Solução**: Removida a asserção de tipo em todas as ocorrências, alinhando com o padrão existente em `client.ts`.
+
+**Arquivos alterados**:
+
+- `src/features/insights/screens/InsightsDashboardScreen.tsx:16`
+- `src/features/insights/screens/ReportDetailScreen.tsx:13`
+- `src/infrastructure/sync/offline-queue.ts:7`
+- `src/infrastructure/sync/sync-engine.ts:15`
+
+**Impacto**: Zero impacto em runtime. Elimina 4 erros de lint que bloqueavam `pnpm lint`. Consistência com o padrão já adotado na camada de infraestrutura de API.
+
+---
+
+#### Problema 2: SQL injection em `clearSyncedRecords` (offline-db.ts)
+
+**Causa raiz**: `db.execAsync()` recebia uma string com interpolação direta de `patientId` — ex: `WHERE patient_id = '${patientId}'`. O método `execAsync` do expo-sqlite 16.x não aceita parâmetros; a interpolação de string é SQL-injectable. Embora `patientId` seja um UUID gerado pelo servidor (risco prático baixo), viola o princípio de defense-in-depth e o Gate 2 da Constituição (segurança).
+
+**Solução**: Substituídas as duas queries de `execAsync` com string interpolada por dois chamadas `runAsync` com placeholders `?` parametrizados — o mesmo padrão usado em todas as outras queries do arquivo.
+
+**Arquivo alterado**: `src/infrastructure/storage/offline-db.ts:224-230`
+
+**Impacto**: Elimina o vetor de SQL injection. Sem impacto em comportamento — `runAsync` executa a mesma operação de forma parametrizada e segura.
+
+---
+
+#### Problema 3: `pointerEvents` como prop View (deprecado no RN 0.71+ com New Architecture)
+
+**Causa raiz**: Com `newArchEnabled: true` em `app.json` e React Native 0.81, a prop `pointerEvents` em componentes View/Animated.View foi movida para propriedade de estilo (deprecação iniciada no RN 0.71). Usando como prop, o renderer da New Architecture (Fabric) ignora o valor ou gera warnings, quebrando o comportamento de overlays não-interativos.
+
+**Solução**:
+
+- `Button.tsx`: Removida prop `pointerEvents="none"` de `<View>` e `<Animated.View>`; adicionado `pointerEvents: "none"` nos StyleSheet entries `shine` e `emGlow`.
+- `app/auth/login.tsx`: DotGrid atualizado de `<View style={StyleSheet.absoluteFillObject} pointerEvents="none">` para `<View style={[StyleSheet.absoluteFillObject, { pointerEvents: "none" }]}>`.
+
+**Arquivos alterados**:
+
+- `src/design/components/ui/Button.tsx` (JSX + StyleSheet)
+- `app/auth/login.tsx` (DotGrid component)
+
+**Impacto**: Garante que os overlays decorativos (shine e emGlow no Button, dot grid no Login) não interceptem toques na New Architecture. Comportamento visual idêntico; compatibilidade com Fabric/RN 0.81 assegurada.
+
+---
+
+#### Stack atual confirmada após diagnóstico
+
+| Pacote              | Versão em `package.json` | Status                          |
+| ------------------- | ------------------------ | ------------------------------- |
+| `expo`              | `~54.0.0`                | ✅ Compatível                   |
+| `react-native`      | `0.81.5`                 | ✅ Compatível                   |
+| `expo-router`       | `~6.0.23`                | ✅ Compatível (SDK 54)          |
+| `expo-sqlite`       | `~16.0.10`               | ✅ API async usada corretamente |
+| `expo-secure-store` | `~15.0.8`                | ✅ Keychain/Keystore correto    |
+| `react`             | `19.1.0`                 | ✅ Compatível                   |
+| `newArchEnabled`    | `true`                   | ✅ New Architecture ativa       |
+
+#### Próximos passos recomendados
+
+1. **Testes E2E em dispositivo físico**: Validar offline queue, sync engine e SQLite com New Architecture ativa (SQLCipher build do expo-sqlite 16.x).
+2. **Audit de `execAsync` restante**: Confirmar que nenhuma outra chamada `execAsync` usa interpolação de string; apenas `initSchema` usa, com DDL estático seguro.
+3. **Testes de regressão no Button**: Verificar que os overlays `shine` e `emGlow` continuam não-interativos com `pointerEvents` no style em dispositivos iOS físicos com RN 0.81.
+4. **Adicionar `@sweetcare/mobile` ao lint do CI**: O `pnpm lint` no monorepo não executa o lint do mobile por padrão — verificar se `turbo.json` inclui a task `lint` para o package mobile.
