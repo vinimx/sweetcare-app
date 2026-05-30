@@ -277,7 +277,7 @@ sweetcare-app/
 │   │       │   │   └── SyncStatusBar.tsx         ← pending count, sync trigger, conflict badge
 │   │       │   └── insights/screens/
 │   │       │       ├── InsightsDashboardScreen.tsx ← lista relatórios, solicita novo, polling status, disclaimer-first
-│   │       │       └── ReportDetailScreen.tsx      ← disclaimer + summary + findings + confidence indicators
+│   │       │       └── ReportDetailScreen.tsx      ← detalhe interativo: stats 2×2, distribuição de confiança, compartilhamento nativo (Share API)
 │   │       └── infrastructure/
 │   │           ├── api/
 │   │           │   ├── client.ts          ← apiClient (get/post/patch/delete), ApiError, token refresh automático
@@ -1362,3 +1362,27 @@ Impacto: `infra/docker/compose.dev.yml`.
 Após 3 falhas consecutivas de conexão (container down), o circuit breaker abre e bloqueia novas chamadas por 30 s. Se relatórios continuam falhando após o container subir, aguarde 30 s ou reinicie o processo da API para resetar o estado em memória.
 
 _Última atualização: 2026-05-30 — Fix AI service: SyntaxError + Dockerfile.dev + hatchling + healthcheck_
+
+### 2026-05-30 — Insights interativos: estatísticas, gráfico de confiança e compartilhamento
+
+**Decisão: ReportDetailScreen reescrito com estatísticas visuais e Share nativo**
+Motivação: A tela anterior mostrava apenas texto do relatório sem nenhuma visualização. Para ser útil em consultas médicas, a tela precisa de: (1) métricas de relance (padrões encontrados, alta confiança, cobertura, período); (2) gráfico de distribuição de confiança; (3) barras de progresso por achado; (4) botão de compartilhamento para WhatsApp, e-mail, impressão.
+
+Implementação:
+
+- Grid de estatísticas 2×2: total padrões / alta confiança / cobertura % / dias do período — todos derivados da resposta da API sem fetch adicional.
+- `ConfidenceBarRow`: gráfico de barras horizontais (pixel width via `CHART_TRACK_WIDTH = SCREEN_WIDTH - 164`) para contagem de padrões por nível de confiança. Pixel em vez de percentual de string para evitar conflito de tipo TypeScript com `DimensionValue`.
+- `ProgressBar`: barra de progresso com `width: \`${safe}%\` as \`${number}%\``— usada em`FindingCard`(confiança categórica: 33%/66%/100%) e`CoverageBox`(percentual real do`confidence_context`).
+- `generateShareText()`: formata o relatório completo como texto estruturado para compartilhamento (separadores, seções, disclaimer, achados numerados com nível de confiança). Chamada apenas em `handleShare` que usa `Share.share()` da API nativa do React Native — zero nova dependência.
+- Dois pontos de acesso ao share: botão no topo (nav bar) e botão destacado na seção "Levar para a consulta médica" na parte inferior.
+
+**Decisão: seleção de relatório gerenciada por estado em `insights.tsx` (não rota separada)**
+Motivação: `InsightsDashboardScreen` já tinha prop `onSelectReport?: (reportId: string) => void` mas a tab `insights.tsx` não a passava — clicar em relatórios completos não fazia nada. A abordagem mais simples é state local `selectedReportId` na tab: quando definido, renderiza `ReportDetailScreen` com `onBack` que reseta para null; quando null, renderiza `InsightsDashboardScreen`. Evita criar arquivo de rota, sem mudança de contrato de componente.
+Impacto: `app/(tabs)/insights.tsx` — `useState<string | null>(null)`, import de `ReportDetailScreen`, renderização condicional.
+
+**Arquivos modificados:**
+
+- `src/features/insights/screens/ReportDetailScreen.tsx` — reescrito (265 → 450 linhas)
+- `app/(tabs)/insights.tsx` — `useState` + import `ReportDetailScreen` + `onSelectReport` wired
+
+_Última atualização: 2026-05-30 — Insights interativos: stats grid + confidence chart + Share API_
