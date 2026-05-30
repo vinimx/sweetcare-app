@@ -1,4 +1,4 @@
-,"""SweetCare AI Service — FastAPI entry point.
+"""SweetCare AI Service — FastAPI entry point.
 
 Internal service only: not publicly reachable.
 All requests must originate from the Fastify API proxy.

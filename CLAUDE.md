@@ -1328,7 +1328,7 @@ Solução: `insights.routes.ts` agora cria duas variantes de `periodEnd`:
   Impacto: `insights.routes.ts`; sem mudança de contrato externo; relatórios gerados no `period_end` agora incluem registros de todo o dia.
 
 **Decisão: período fixo de 30 dias para todos os tipos de relatório no mobile**
-Motivação: O tipo `weekly_summary` usava 7 dias, insuficiente para usuários que acabaram de iniciar o uso do app. "weekly_summary" descreve o _formato_ do relatório, não o período coberto. 30 dias garante dados suficientes na maioria dos casos de uso.
+Motivação: O tipo `weekly_summary` usava 7 dias, insuficiente para usuários que acabaram de iniciar o uso do app. "weekly*summary" descreve o \_formato* do relatório, não o período coberto. 30 dias garante dados suficientes na maioria dos casos de uso.
 Impacto: `InsightsDashboardScreen.tsx` — `periodForLastDays(selectedType === "weekly_summary" ? 7 : 30)` → `periodForLastDays(30)`.
 
 **UX: banner inline para INSUFFICIENT_DATA em vez de Alert genérico**
@@ -1336,3 +1336,29 @@ Motivação: O Alert de erro mostrava a mensagem técnica da API ("At Least 3 in
 Impacto: `InsightsDashboardScreen.tsx` — estado `insufficientData`; banner laranja (FFF7ED / FED7AA) com texto em pt-BR; limpo ao iniciar nova solicitação.
 
 _Última atualização: 2026-05-30 — Fix Insights 422: end-of-day periodEnd + 30-day window + INSUFFICIENT_DATA UX_
+
+### 2026-05-30 — Fix: AI service container não subia (3 causas independentes)
+
+**Fix 1: `main.py` tinha vírgula inválida antes do docstring**
+Causa: Caractere `,` espúrio em linha 1 causava `SyntaxError` no startup do uvicorn → container reiniciava em loop.
+Impacto: `apps/ai-service/app/main.py` linha 1.
+
+**Fix 2: `Dockerfile.dev` usava `--no-install-project` (flag de `uv sync`, não de `uv pip install`)**
+Causa: Flag introduzida erroneamente em sessão anterior. A versão do uv instalada na imagem não reconhece essa flag em `uv pip install`, causando falha de build.
+Solução: `COPY . .` antes do `RUN uv pip install --system -e ".[dev]"` — fonte disponível no momento do install. Volume mount do Compose sobrescreve `/app` em runtime para hot-reload via uvicorn `--reload`.
+Impacto: `apps/ai-service/Dockerfile.dev`.
+
+**Fix 3: `pyproject.toml` sem configuração de pacote hatchling**
+Causa: Hatchling não encontra o pacote porque o projeto se chama `sweetcare-ai-service` mas o código está em `app/`. Erro: `Unable to determine which files to ship inside the wheel`.
+Solução: `[tool.hatch.build.targets.wheel] packages = ["app"]` adicionado ao `pyproject.toml`.
+Impacto: `apps/ai-service/pyproject.toml`.
+
+**Fix 4: healthcheck do Compose usava `curl` (não instalado em `python:3.12-slim`)**
+Causa: O healthcheck falhava em toda verificação — container ficava perpetuamente "unhealthy" mesmo funcional.
+Solução: `python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"`.
+Impacto: `infra/docker/compose.dev.yml`.
+
+**Nota: circuit breaker do AI service client**
+Após 3 falhas consecutivas de conexão (container down), o circuit breaker abre e bloqueia novas chamadas por 30 s. Se relatórios continuam falhando após o container subir, aguarde 30 s ou reinicie o processo da API para resetar o estado em memória.
+
+_Última atualização: 2026-05-30 — Fix AI service: SyntaxError + Dockerfile.dev + hatchling + healthcheck_
