@@ -209,6 +209,28 @@ export default async function authRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
+  // PATCH /users/me — update authenticated user's display name
+  app.patch(
+    "/users/me",
+    {
+      preHandler: [app.authenticate],
+      schema: {
+        body: z.object({ display_name: z.string().min(1).max(120) }),
+        response: { 200: userSchema, 401: errorSchema, 422: errorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { display_name } = request.body;
+      const prisma = getPrismaClient();
+      await prisma.user.update({
+        where: { id: request.jwtUser.sub },
+        data: { displayName: display_name },
+      });
+      const user = await fetchUserById(request.jwtUser.sub);
+      return reply.status(200).send(user);
+    },
+  );
+
   // POST /auth/mfa/verify — stub for Phase 2 extension
   app.post("/auth/mfa/verify", { schema: { body: mfaVerifySchema } }, async (_request, reply) => {
     return reply.status(501).send({

@@ -4,8 +4,11 @@ import { createPatientSchema } from "@sweetcare/shared-validation";
 import { CONSENT_TEXT_VERSION } from "@sweetcare/shared-config";
 import { getPrismaClient } from "../../infrastructure/database/client.js";
 import { hashSensitive } from "../../infrastructure/database/encryption-middleware.js";
-import { auditCreate } from "../../application/audit/audit.service.js";
-import { requirePatientAccess } from "../../infrastructure/auth/rbac.middleware.js";
+import { auditCreate, auditUpdate } from "../../application/audit/audit.service.js";
+import {
+  requirePatientAccess,
+  requireWriteAccess,
+} from "../../infrastructure/auth/rbac.middleware.js";
 
 const errorSchema = z.object({
   error: z.string(),
@@ -179,6 +182,41 @@ export default async function patientsRoutes(app: FastifyInstance) {
     },
   );
 
+  // GET /patients — list all patients the authenticated user has access to
+  app.get(
+    "/patients",
+    {
+      preHandler: [app.authenticate],
+      schema: {
+        response: { 200: z.object({ patients: z.array(patientProfileSchema) }) },
+      },
+    },
+    async (request, reply) => {
+      const prisma = getPrismaClient();
+
+      // Two-step query: PHI extension decrypts by modelKey.
+      // Using include nests patientProfile under caregiverAssignment, so the
+      // extension runs with modelKey="caregiverAssignment" and never decrypts
+      // the PHI fields of patientProfile (fullName, insulinType*).
+      const assignments = await prisma.caregiverAssignment.findMany({
+        where: { userId: request.jwtUser.sub, revokedAt: null },
+        select: { patientProfileId: true },
+      });
+
+      if (assignments.length === 0) {
+        return reply.status(200).send({ patients: [] });
+      }
+
+      const patientIds = assignments.map((a) => a.patientProfileId);
+      const profiles = await prisma.patientProfile.findMany({
+        where: { id: { in: patientIds }, isActive: true },
+        select: PATIENT_SELECT,
+      });
+
+      return reply.status(200).send({ patients: profiles.map(mapPatientProfile) });
+    },
+  );
+
   // GET /patients/:patientId
   app.get(
     "/patients/:patientId",
@@ -204,6 +242,98 @@ export default async function patientsRoutes(app: FastifyInstance) {
           correlationId: request.id,
         });
       }
+
+      return reply.status(200).send(mapPatientProfile(profile));
+    },
+  );
+
+  // PATCH /patients/:patientId — partial update of patient profile
+  const updatePatientBodySchema = z.object({
+    full_name: z.string().min(1).max(120).optional(),
+    date_of_birth: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    diagnosis_year: z.number().int().min(1950).max(new Date().getFullYear()).optional(),
+    target_glucose_min_mgdl: z.number().int().min(40).max(300).optional(),
+    target_glucose_max_mgdl: z.number().int().min(60).max(400).optional(),
+    insulin_type_basal: z.string().max(60).nullable().optional(),
+    insulin_type_bolus: z.string().max(60).nullable().optional(),
+    icr_units_per_gram_carb: z.number().positive().max(10).nullable().optional(),
+    isf_mgdl_per_unit: z.number().positive().max(300).nullable().optional(),
+  });
+
+  app.patch(
+    "/patients/:patientId",
+    {
+      preHandler: [app.authenticate, requirePatientAccess, requireWriteAccess],
+      schema: {
+        params: z.object({ patientId: z.string().uuid() }),
+        body: updatePatientBodySchema,
+        response: {
+          200: patientProfileSchema,
+          403: errorSchema,
+          404: errorSchema,
+          422: errorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { patientId } = request.params as { patientId: string };
+      const body = request.body;
+      const prisma = getPrismaClient();
+
+      if (
+        body.target_glucose_min_mgdl !== undefined &&
+        body.target_glucose_max_mgdl !== undefined &&
+        body.target_glucose_max_mgdl <= body.target_glucose_min_mgdl
+      ) {
+        return reply.status(422).send({
+          error: "INVALID_GLUCOSE_TARGETS",
+          message: "target_glucose_max_mgdl must be greater than target_glucose_min_mgdl",
+          correlationId: request.id,
+        });
+      }
+
+      const updateData: Record<string, unknown> = {};
+      if (body.full_name !== undefined) updateData.fullName = body.full_name;
+      if (body.date_of_birth !== undefined) updateData.dateOfBirth = new Date(body.date_of_birth);
+      if (body.diagnosis_year !== undefined) updateData.diagnosisYear = body.diagnosis_year;
+      if (body.target_glucose_min_mgdl !== undefined)
+        updateData.targetGlucoseMinMgdl = body.target_glucose_min_mgdl;
+      if (body.target_glucose_max_mgdl !== undefined)
+        updateData.targetGlucoseMaxMgdl = body.target_glucose_max_mgdl;
+      if (body.insulin_type_basal !== undefined)
+        updateData.insulinTypeBasal = body.insulin_type_basal;
+      if (body.insulin_type_bolus !== undefined)
+        updateData.insulinTypeBolus = body.insulin_type_bolus;
+      if (body.icr_units_per_gram_carb !== undefined)
+        updateData.icrUnitsPerGramCarb = body.icr_units_per_gram_carb;
+      if (body.isf_mgdl_per_unit !== undefined) updateData.isfMgdlPerUnit = body.isf_mgdl_per_unit;
+
+      if (Object.keys(updateData).length === 0) {
+        return reply.status(422).send({
+          error: "EMPTY_UPDATE",
+          message: "At least one field must be provided",
+          correlationId: request.id,
+        });
+      }
+
+      const profile = await prisma.patientProfile.update({
+        where: { id: patientId },
+        data: updateData,
+        select: PATIENT_SELECT,
+      });
+
+      void auditUpdate({
+        actorUserId: request.jwtUser.sub,
+        correlationId: request.id,
+        targetTable: "patient_profiles",
+        targetId: patientId,
+        diffSummary: { updatedFields: Object.keys(updateData) },
+        ipAddress: request.ip ?? "unknown",
+        userAgent: request.headers["user-agent"] ?? "unknown",
+      });
 
       return reply.status(200).send(mapPatientProfile(profile));
     },

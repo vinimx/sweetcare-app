@@ -9,7 +9,9 @@ import { Divider } from "../../src/design/components/ui/Divider.js";
 import { useTheme } from "../../src/design/contexts/ThemeContext.js";
 import { useAuth } from "../../src/infrastructure/auth/AuthContext.js";
 import { apiClient } from "../../src/infrastructure/api/client.js";
+import type { PatientProfile } from "@sweetcare/shared-types";
 
+/* ── SettingsRow ────────────────────────────────────────────────── */
 function SettingsRow({
   icon,
   label,
@@ -71,9 +73,79 @@ function SettingsRow({
   );
 }
 
+/* ── PatientRow ─────────────────────────────────────────────────── */
+function PatientRow({
+  patient,
+  isActive,
+  onSelect,
+  onEdit,
+}: {
+  patient: PatientProfile;
+  isActive: boolean;
+  onSelect: () => void;
+  onEdit: () => void;
+}) {
+  const { theme } = useTheme();
+  return (
+    <View
+      style={[
+        styles.patientRow,
+        {
+          borderBottomColor: theme.colors.border.subtle,
+          backgroundColor: isActive ? theme.colors.primary.surface : theme.colors.surface.DEFAULT,
+        },
+      ]}
+    >
+      <TouchableOpacity
+        style={styles.patientRowContent}
+        onPress={onSelect}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`Selecionar ${patient.fullName} como paciente ativo`}
+        accessibilityState={{ selected: isActive }}
+      >
+        <View
+          style={[
+            styles.patientAvatar,
+            {
+              backgroundColor: isActive
+                ? theme.colors.primary.DEFAULT
+                : theme.colors.surface.subtle,
+            },
+          ]}
+        >
+          <Icon name="heart" size="sm" color={isActive ? "#fff" : theme.colors.text.tertiary} />
+        </View>
+        <View style={styles.patientInfo}>
+          <Text
+            variant="body"
+            color={isActive ? theme.colors.primary.DEFAULT : theme.colors.text.primary}
+            style={isActive ? styles.patientNameActive : undefined}
+          >
+            {patient.fullName}
+          </Text>
+          <Text variant="caption" color={theme.colors.text.tertiary}>
+            {`Diagnóstico: ${String(patient.diagnosisYear)} · Alvo: ${String(patient.targetGlucoseMinMgdl)}–${String(patient.targetGlucoseMaxMgdl)} mg/dL`}
+          </Text>
+        </View>
+        {isActive && <Icon name="check-circle" size="sm" color={theme.colors.primary.DEFAULT} />}
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.patientEditBtn}
+        onPress={onEdit}
+        accessibilityRole="button"
+        accessibilityLabel={`Editar dados de ${patient.fullName}`}
+      >
+        <Icon name="edit-2" size="sm" color={theme.colors.text.tertiary} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/* ── Screen ─────────────────────────────────────────────────────── */
 export default function SettingsScreen() {
   const { theme } = useTheme();
-  const { user, activePatient, logout } = useAuth();
+  const { user, patients, activePatient, setActivePatient, logout } = useAuth();
   const router = useRouter();
   const [exportLoading, setExportLoading] = useState(false);
 
@@ -132,7 +204,6 @@ export default function SettingsScreen() {
         : (user?.role ?? "—");
 
   return (
-    // edges={["top"]} — bottom inset is handled by the tab bar
     <SafeAreaView
       edges={["top"]}
       style={[styles.safe, { backgroundColor: theme.colors.background.DEFAULT }]}
@@ -142,12 +213,18 @@ export default function SettingsScreen() {
           Perfil
         </Text>
 
-        {/* User card */}
-        <View
+        {/* User card — tappable → edit profile */}
+        <TouchableOpacity
           style={[
             styles.userCard,
             { backgroundColor: theme.colors.surface.DEFAULT, ...theme.shadows.md },
           ]}
+          onPress={() => {
+            router.push("/profile/edit");
+          }}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Editar perfil"
         >
           <View style={[styles.userAvatar, { backgroundColor: theme.colors.primary.surface }]}>
             <Text variant="h2" color={theme.colors.primary.DEFAULT}>
@@ -163,11 +240,12 @@ export default function SettingsScreen() {
               {roleLabel}
             </Text>
           </View>
-        </View>
+          <Icon name="chevron-right" size="sm" color={theme.colors.text.tertiary} />
+        </TouchableOpacity>
 
-        {/* Patient section */}
+        {/* Patients section */}
         <Text variant="h4" style={styles.sectionTitle}>
-          Paciente ativo
+          Meus pacientes
         </Text>
         <View
           style={[
@@ -175,29 +253,44 @@ export default function SettingsScreen() {
             { backgroundColor: theme.colors.surface.DEFAULT, ...theme.shadows.sm },
           ]}
         >
-          {activePatient ? (
+          {patients.length === 0 ? (
+            <SettingsRow
+              icon="user-plus"
+              label="Adicionar paciente"
+              sublabel="Nenhum paciente cadastrado"
+              onPress={() => {
+                router.push("/patients/new");
+              }}
+            />
+          ) : (
             <>
-              <SettingsRow
-                icon="heart"
-                label={activePatient.fullName}
-                sublabel={`Diagnóstico em ${String(activePatient.diagnosisYear)} · Alvo: ${String(activePatient.targetGlucoseMinMgdl)}–${String(activePatient.targetGlucoseMaxMgdl)} mg/dL`}
-              />
+              {patients.map((patient, index) => (
+                <React.Fragment key={patient.id}>
+                  {index > 0 && <Divider />}
+                  <PatientRow
+                    patient={patient}
+                    isActive={activePatient?.id === patient.id}
+                    onSelect={() => {
+                      void setActivePatient(patient);
+                    }}
+                    onEdit={() => {
+                      router.push({
+                        pathname: "/patients/edit/[id]",
+                        params: { id: patient.id },
+                      });
+                    }}
+                  />
+                </React.Fragment>
+              ))}
+              <Divider />
               <SettingsRow
                 icon="user-plus"
-                label="Trocar paciente"
+                label="Novo paciente"
                 onPress={() => {
                   router.push("/patients/new");
                 }}
               />
             </>
-          ) : (
-            <SettingsRow
-              icon="user-plus"
-              label="Adicionar paciente"
-              onPress={() => {
-                router.push("/patients/new");
-              }}
-            />
           )}
         </View>
 
@@ -286,6 +379,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { padding: 20, paddingBottom: 48 },
   pageTitle: { marginBottom: 20 },
+
+  /* User card */
   userCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -303,8 +398,12 @@ const styles = StyleSheet.create({
   },
   userInfo: { flex: 1 },
   roleText: { marginTop: 2 },
+
+  /* Sections */
   sectionTitle: { marginBottom: 10, marginTop: 4 },
   card: { borderRadius: 16, overflow: "hidden", marginBottom: 24 },
+
+  /* Generic row */
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -320,6 +419,42 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   rowContent: { flex: 1 },
+
+  /* Patient rows */
+  patientRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    minHeight: 68,
+  },
+  patientRowContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    paddingLeft: 16,
+    paddingRight: 8,
+  },
+  patientAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  patientInfo: { flex: 1 },
+  patientNameActive: { fontWeight: "600" },
+  patientEditBtn: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingRight: 4,
+  },
+
+  /* Footer */
   logoutBtn: { marginTop: 8, marginBottom: 20 },
   footer: { lineHeight: 18 },
 });

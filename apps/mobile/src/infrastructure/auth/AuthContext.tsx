@@ -17,10 +17,15 @@ interface AuthRefreshResponse extends AuthTokens {
   refreshToken: string;
 }
 
+interface PatientsResponse {
+  patients: PatientProfile[];
+}
+
 interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   user: User | null;
+  patients: PatientProfile[];
   activePatient: PatientProfile | null;
   activePatientId: string | null;
 }
@@ -31,15 +36,27 @@ interface AuthContextValue extends AuthState {
   logout: () => Promise<void>;
   setActivePatient: (patient: PatientProfile) => Promise<void>;
   refreshPatient: () => Promise<void>;
+  refreshPatients: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+async function loadPatients(): Promise<PatientProfile[]> {
+  try {
+    const resp = await apiClient.get<PatientsResponse>("/patients");
+    return resp.patients;
+  } catch {
+    return [];
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({
     isLoading: true,
     isAuthenticated: false,
     user: null,
+    patients: [],
     activePatient: null,
     activePatientId: null,
   });
@@ -52,17 +69,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       const user = await apiClient.get<User>("/users/me");
-      const patientId = await SecureStore.getItemAsync(ACTIVE_PATIENT_KEY);
-      let patient: PatientProfile | null = null;
-      if (patientId) {
-        patient = await apiClient.get<PatientProfile>(`/patients/${patientId}`).catch(() => null);
+      const patients = await loadPatients();
+      const storedId = await SecureStore.getItemAsync(ACTIVE_PATIENT_KEY);
+
+      let activePatient: PatientProfile | null = null;
+      let activePatientId: string | null = storedId;
+
+      if (storedId) {
+        activePatient = patients.find((p) => p.id === storedId) ?? null;
       }
+      // Auto-select first patient if none stored
+      if (!activePatient && patients.length > 0) {
+        activePatient = patients[0] ?? null;
+        if (activePatient) {
+          await SecureStore.setItemAsync(ACTIVE_PATIENT_KEY, activePatient.id);
+          activePatientId = activePatient.id;
+        }
+      }
+
       setState({
         isLoading: false,
         isAuthenticated: true,
         user,
-        activePatient: patient,
-        activePatientId: patientId,
+        patients,
+        activePatient,
+        activePatientId,
       });
     } catch {
       await tokenStorage.clearAll();
@@ -70,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
         isAuthenticated: false,
         user: null,
+        patients: [],
         activePatient: null,
         activePatientId: null,
       });
@@ -99,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isLoading: false,
           isAuthenticated: false,
           user: null,
+          patients: [],
           activePatient: null,
           activePatientId: null,
         });
@@ -111,7 +144,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const data = await apiClient.post<AuthLoginResponse>("/auth/login", { email, password }, false);
     await tokenStorage.saveAccessToken(data.accessToken);
     await tokenStorage.saveRefreshToken(data.refreshToken);
-    setState((s) => ({ ...s, isAuthenticated: true, user: data.user }));
+    const patients = await loadPatients();
+    const storedId = await SecureStore.getItemAsync(ACTIVE_PATIENT_KEY);
+    let activePatient: PatientProfile | null = null;
+    let activePatientId: string | null = storedId;
+    if (storedId) {
+      activePatient = patients.find((p) => p.id === storedId) ?? null;
+    }
+    if (!activePatient && patients.length > 0) {
+      activePatient = patients[0] ?? null;
+      if (activePatient) {
+        await SecureStore.setItemAsync(ACTIVE_PATIENT_KEY, activePatient.id);
+        activePatientId = activePatient.id;
+      }
+    }
+    setState((s) => ({
+      ...s,
+      isAuthenticated: true,
+      user: data.user,
+      patients,
+      activePatient,
+      activePatientId,
+    }));
   }, []);
 
   const register = useCallback(
@@ -123,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
       await tokenStorage.saveAccessToken(data.accessToken);
       await tokenStorage.saveRefreshToken(data.refreshToken);
-      setState((s) => ({ ...s, isAuthenticated: true, user: data.user }));
+      setState((s) => ({ ...s, isAuthenticated: true, user: data.user, patients: [] }));
     },
     [],
   );
@@ -141,6 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading: false,
       isAuthenticated: false,
       user: null,
+      patients: [],
       activePatient: null,
       activePatientId: null,
     });
@@ -162,9 +217,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state]);
 
+  const refreshPatients = useCallback(async () => {
+    try {
+      const patients = await loadPatients();
+      setState((s) => {
+        const updatedActive = s.activePatientId
+          ? (patients.find((p) => p.id === s.activePatientId) ?? s.activePatient)
+          : s.activePatient;
+        return { ...s, patients, activePatient: updatedActive };
+      });
+    } catch {
+      /* keep stale */
+    }
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const user = await apiClient.get<User>("/users/me");
+      setState((s) => ({ ...s, user }));
+    } catch {
+      /* keep stale */
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
-      value={{ ...state, login, register, logout, setActivePatient, refreshPatient }}
+      value={{
+        ...state,
+        login,
+        register,
+        logout,
+        setActivePatient,
+        refreshPatient,
+        refreshPatients,
+        refreshUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

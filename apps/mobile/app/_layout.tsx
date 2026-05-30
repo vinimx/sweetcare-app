@@ -60,6 +60,13 @@ export default function RootLayout() {
                 }}
               />
               <Stack.Screen
+                name="patients/edit/[id]"
+                options={{
+                  headerShown: true,
+                  title: "Editar Paciente",
+                }}
+              />
+              <Stack.Screen
                 name="alerts/[alertId]"
                 options={{
                   presentation: "modal",

@@ -60,7 +60,7 @@ function validate(f: FormState): FieldErrors {
 
 export default function NewPatientScreen() {
   const { theme } = useTheme();
-  const { setActivePatient } = useAuth();
+  const { setActivePatient, refreshPatients } = useAuth();
   const router = useRouter();
 
   const [form, setForm] = useState<FormState>(DEFAULTS);
@@ -96,6 +96,7 @@ export default function NewPatientScreen() {
 
       const created = await apiClient.post<PatientProfile>("/patients", payload);
       await setActivePatient(created);
+      await refreshPatients();
       router.back();
     } catch {
       Alert.alert(

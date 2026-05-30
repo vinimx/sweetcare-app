@@ -208,7 +208,7 @@ sweetcare-app/
 │   │   ├── app.json                   ← Bundle IDs, plugins: expo-router, expo-secure-store, expo-sqlite
 │   │   ├── global.css                 ← CSS custom properties (design tokens para web/doc reference)
 │   │   ├── app/
-│   │   │   ├── _layout.tsx            ← QueryClient + ThemeProvider + AuthProvider + AuthGate + Stack
+│   │   │   ├── _layout.tsx            ← QueryClient + ThemeProvider + AuthProvider + AuthGate + Stack (inclui patients/edit/[id])
 │   │   │   ├── emergency.tsx          ← Protocolo de emergência fullscreen (offline, 5 protocolos, SAMU/Bombeiros)
 │   │   │   ├── auth/
 │   │   │   │   ├── _layout.tsx        ← Stack auth com animação fade
@@ -219,9 +219,11 @@ sweetcare-app/
 │   │   │   │   ├── index.tsx          ← Timeline: FlatList de DoseCard/SymptomCard/AlertCard por data
 │   │   │   │   ├── log.tsx            ← Segmented control Insulina/Sintoma → InsulinLogScreen / SymptomRecordScreen
 │   │   │   │   ├── insights.tsx       ← Wrapper InsightsDashboardScreen com activePatient
-│   │   │   │   └── settings.tsx       ← Perfil, paciente ativo, LGPD export/delete, logout
+│   │   │   │   └── settings.tsx       ← Perfil, lista de pacientes (select/edit), LGPD export/delete, logout
 │   │   │   ├── patients/
-│   │   │   │   └── new.tsx            ← Modal criação PatientProfile (nome, DOB, diagnóstico, alvos, insulinas)
+│   │   │   │   ├── new.tsx            ← Modal criação PatientProfile (nome, DOB, diagnóstico, alvos, insulinas); chama refreshPatients() pós-criação
+│   │   │   │   └── edit/
+│   │   │   │       └── [id].tsx       ← Editar PatientProfile: fallback API, banner "Paciente ativo", botão "Definir como ativo", PATCH + refreshPatients()
 │   │   │   ├── alerts/
 │   │   │   │   └── [alertId].tsx      ← Modal alerta: guidance steps, contatos emergência, resolver
 │   │   │   └── records/
@@ -445,6 +447,7 @@ User            ──< UserSession   (família de tokens / family invalidation)
 | Método | Rota                  | Auth                          | Status          |
 | ------ | --------------------- | ----------------------------- | --------------- |
 | GET    | `/users/me`           | Bearer                        | ✅ Implementado |
+| PATCH  | `/users/me`           | Bearer                        | ✅ Implementado |
 | POST   | `/auth/register`      | —                             | ✅ Implementado |
 | POST   | `/auth/login`         | —                             | ✅ Implementado |
 | POST   | `/auth/refresh`       | Cookie ou body `refreshToken` | ✅ Implementado |
@@ -1255,3 +1258,47 @@ Motivação: `parseFloat("4.") === 4` → `.toString() === "4"` — o decimal er
 Impacto: `InsulinLogScreen.tsx` — estados `doseStr`, `carbsStr`, `glucoseStr` independentes do state do `Controller`.
 
 _Última atualização: 2026-05-29 — CRUD completo para registros médicos + offline-queue fix + typecheck/lint ✅_
+
+### 2026-05-30 — Gerenciamento completo de múltiplos pacientes (Meus Pacientes)
+
+**Fix: `patients/new.tsx` não chamava `refreshPatients()` após criação**
+Motivação: `setActivePatient(created)` persiste o ID no SecureStore e atualiza `activePatient` no contexto, mas não adiciona o paciente ao array `patients`. A tela de Settings, ao receber foco novamente, renderizava a lista antiga — o novo paciente não aparecia até o próximo logout/login.
+Impacto: `app/patients/new.tsx` — `refreshPatients()` chamado logo após `setActivePatient(created)`, antes de `router.back()`. O GET /patients retorna a lista atualizada e `refreshPatients` também sincroniza `activePatient` pelo `activePatientId` armazenado.
+
+**Decisão: `patients/edit/[id].tsx` com fallback de API e botão "Definir como ativo"**
+Motivação: O formulário de edição inicializava apenas com dados do contexto (`patients.find(...)`). Em navegação direta (deep link, contexto stale), o paciente não seria encontrado e o formulário apareceria vazio ou com mensagem "não encontrado". O botão "Definir como ativo" era ausente — usuário precisava sair da tela de edição e clicar novamente na lista em Settings.
+Solução:
+
+1. Fallback de API: `useEffect` tenta `GET /patients/:id` quando `patientInCtx === null`, com cleanup de requisição em voo (`let live = true`). Exibe `ActivityIndicator` durante a busca.
+2. Sync de form via `useRef` para inicializar apenas uma vez (`formInitRef.current`), evitando reset do formulário se o contexto atualizar enquanto o usuário edita.
+3. Banner "Paciente ativo no momento" quando `activePatient.id === id`; botão "Definir como paciente ativo" (chama `setActivePatient` + `router.back()`) quando não é o ativo.
+4. Título dinâmico via `<Stack.Screen options={{ title: patient.fullName }}>` — sobrescreve o default "Editar Paciente" do `_layout.tsx`.
+   Impacto: `app/patients/edit/[id].tsx` — reescrito com `useMemo`, `useRef`, `useEffect` para fetch e sync de form; `ActivityIndicator` adicionado; `activePatient` e `setActivePatient` agora consumidos do contexto.
+
+**Decisão: `_layout.tsx` declara explicitamente `patients/edit/[id]`**
+Motivação: Sem declaração explícita, Expo Router aplica `screenOptions={{ headerShown: false }}` global ao `patients/edit/[id]`. O `Stack.Screen` interno do componente sobrescreve corretamente, mas depende de uma renderização condicional (`if fetching / if !patient / form`) — antes de qualquer renderização completar, a tela ficava sem header. A declaração explícita garante `headerShown: true` desde o primeiro frame.
+Impacto: `app/_layout.tsx` — novo `<Stack.Screen name="patients/edit/[id]" options={{ headerShown: true, title: "Editar Paciente" }} />`.
+
+**Fluxo completo de troca de paciente ativo**
+
+1. Settings lista pacientes via `patients` do contexto (carregado no login/session restore)
+2. Tap em paciente → `setActivePatient(patient)` → persiste ID no SecureStore + atualiza `state.activePatient`
+3. Tab "Início" usa `activePatient?.id` como React Query key → React Query refetch automático para o novo paciente
+4. Tab "Registrar" e "Insights" leem `activePatient` do contexto → exibem dados do novo paciente
+5. Edição PATCH → `refreshPatients()` → `state.patients` e `state.activePatient` atualizados (se o editado for o ativo)
+
+**Fix: bug de import em `patients.routes.ts`**
+Motivação: `requireWriteAccess` estava exportado em `rbac.middleware.ts` mas não importado em `patients.routes.ts`, causando `ReferenceError` ao iniciar o servidor e bloqueando a rota `PATCH /patients/:patientId`.
+Impacto: `patients.routes.ts` — import corrigido para incluir `requireWriteAccess`.
+
+**Fix: Dockerfile.dev do AI service**
+Motivação: `uv pip install --system -e ".[dev]"` com apenas `pyproject.toml` copiado falha porque hatchling não encontra o código-fonte do pacote para o editable install. `--no-install-project` instala somente as dependências (deps) sem tentar construir o pacote em si — comportamento correto para ambiente de desenvolvimento com `--reload`.
+Impacto: `infra/docker/compose.dev.yml` Dockerfile.dev — flag alterada para `--no-install-project ".[dev]"`.
+
+**Fix: `GET /patients` retornava `fullName` cifrado (hex) em vez do nome real**
+Motivação: O middleware PHI (`$extends` do Prisma) intercepta operações pelo `modelKey` da query raiz. `caregiverAssignment.findMany({ include: { patientProfile: ... } })` usa `modelKey = "caregiverAssignment"` — que não tem campos PHI mapeados. O `patientProfile` aninhado nunca passava por `decryptPhiFields("patientProfile", ...)`, então `fullName`, `insulinTypeBasal` e `insulinTypeBolus` chegavam ao cliente como strings hex cifradas (exibidas na UI como UUID-like).
+Solução: Duas queries diretas e separadas — (1) `caregiverAssignment.findMany` retorna apenas `patientProfileId`; (2) `patientProfile.findMany({ where: { id: { in: patientIds } } })` roda com `modelKey = "patientProfile"` e o middleware descriptografa corretamente.
+Impacto: `patients.routes.ts` — handler de `GET /patients`; sem mudança de contrato de API; todos os outros endpoints de `patientProfile` já usavam queries diretas e estavam corretos.
+Padrão a seguir: **nunca usar `include` para cruzar um modelo que tem PHI com outro** — sempre fazer duas queries separadas ou um `select` no modelo PHI diretamente.
+
+_Última atualização: 2026-05-30 — Fix PHI decrypt em GET /patients (fullName cifrado na UI)_
