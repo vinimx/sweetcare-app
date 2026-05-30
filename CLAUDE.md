@@ -1317,4 +1317,22 @@ Impacto: `patients.routes.ts` — POST /patients cria dois ConsentRecord por pac
 **Padrão estabelecido: todas as telas mobile devem usar `apiClient` — nunca `fetch` bruto**
 Razão: `apiClient` é o único ponto que faz refresh automático de token. Qualquer tela que usa `fetch` diretamente ou `tokenStorage.getAccessToken()` sem refresh vai falhar silenciosamente após 15 minutos.
 
-_Última atualização: 2026-05-30 — Fix Insights: apiClient + auto-grant ai_analysis consent + consent UI_
+### 2026-05-30 — Fix: Insights 422 INSUFFICIENT_DATA — bug de data + período curto
+
+**Decisão: `periodEnd` com end-of-day (T23:59:59.999Z) para queries de agregação**
+Motivação: `new Date("2026-05-30")` = `2026-05-30T00:00:00.000Z` (meia-noite UTC). Registros criados durante o dia (ex: `2026-05-30T14:00:00Z`) tinham `appliedAt > periodEnd` e eram excluídos pelo filtro `lte` do Prisma. Resultado: qualquer dia em que o período terminava hoje excluía todos os registros desse dia → INSUFFICIENT_DATA mesmo com registros válidos.
+Solução: `insights.routes.ts` agora cria duas variantes de `periodEnd`:
+
+- `periodEndForStorage` = `T00:00:00.000Z` — usado em `createInsightReport` e `validateReportPeriod` (semântica de data-calendário)
+- `periodEndForQuery` = `T23:59:59.999Z` — usado em ambas as chamadas de `aggregatePatientData` (semântica de dia completo)
+  Impacto: `insights.routes.ts`; sem mudança de contrato externo; relatórios gerados no `period_end` agora incluem registros de todo o dia.
+
+**Decisão: período fixo de 30 dias para todos os tipos de relatório no mobile**
+Motivação: O tipo `weekly_summary` usava 7 dias, insuficiente para usuários que acabaram de iniciar o uso do app. "weekly_summary" descreve o _formato_ do relatório, não o período coberto. 30 dias garante dados suficientes na maioria dos casos de uso.
+Impacto: `InsightsDashboardScreen.tsx` — `periodForLastDays(selectedType === "weekly_summary" ? 7 : 30)` → `periodForLastDays(30)`.
+
+**UX: banner inline para INSUFFICIENT_DATA em vez de Alert genérico**
+Motivação: O Alert de erro mostrava a mensagem técnica da API ("At Least 3 insulin records are required"). O banner inline instrui o usuário a registrar mais aplicações antes de tentar novamente.
+Impacto: `InsightsDashboardScreen.tsx` — estado `insufficientData`; banner laranja (FFF7ED / FED7AA) com texto em pt-BR; limpo ao iniciar nova solicitação.
+
+_Última atualização: 2026-05-30 — Fix Insights 422: end-of-day periodEnd + 30-day window + INSUFFICIENT_DATA UX_

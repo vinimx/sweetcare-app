@@ -91,17 +91,23 @@ export default function InsightsDashboardScreen({ patientId, onSelectReport }: P
   const [selectedType, setSelectedType] = useState<string>("weekly_summary");
   const [needsConsent, setNeedsConsent] = useState(false);
   const [grantingConsent, setGrantingConsent] = useState(false);
+  const [insufficientData, setInsufficientData] = useState(false);
   const { data: reports, isLoading, isRefetching, refetch } = useInsightReports(patientId);
   const requestReport = useRequestReport(patientId);
 
   const handleRequest = useCallback(() => {
-    const period = periodForLastDays(selectedType === "weekly_summary" ? 7 : 30);
+    setInsufficientData(false);
+    const period = periodForLastDays(30);
     requestReport.mutate(
       { report_type: selectedType, ...period },
       {
         onError: (err) => {
           if (err instanceof ApiError && err.code === "CONSENT_REQUIRED") {
             setNeedsConsent(true);
+            return;
+          }
+          if (err instanceof ApiError && err.code === "INSUFFICIENT_DATA") {
+            setInsufficientData(true);
             return;
           }
           Alert.alert(
@@ -176,6 +182,17 @@ export default function InsightsDashboardScreen({ patientId, onSelectReport }: P
               <Text style={styles.buttonText}>Autorizar análise</Text>
             )}
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Insufficient data — shown when the 30-day window has < 3 insulin records */}
+      {insufficientData && (
+        <View style={styles.insufficientBanner} accessibilityRole="alert">
+          <Text style={styles.insufficientTitle}>Dados insuficientes</Text>
+          <Text style={styles.insufficientBody}>
+            São necessários pelo menos 3 registros de insulina nos últimos 30 dias para gerar um
+            relatório. Continue registrando as aplicações e tente novamente.
+          </Text>
         </View>
       )}
 
@@ -301,6 +318,17 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 16,
   },
+  insufficientBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 16,
+    backgroundColor: "#FFF7ED",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+  },
+  insufficientTitle: { fontSize: 15, fontWeight: "700", color: "#9A3412", marginBottom: 6 },
+  insufficientBody: { fontSize: 13, color: "#9A3412", lineHeight: 18 },
   section: { margin: 16 },
   sectionTitle: { fontSize: 18, fontWeight: "600", color: "#111827", marginBottom: 12 },
   typeRow: { marginBottom: 12 },

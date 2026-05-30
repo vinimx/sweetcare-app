@@ -87,10 +87,13 @@ export default async function insightsRoutes(app: FastifyInstance) {
         });
       }
 
-      const periodStart = new Date(body.period_start);
-      const periodEnd = new Date(body.period_end);
+      // Parse as UTC midnight — used for storage and period validation (calendar days)
+      const periodStart = new Date(body.period_start + "T00:00:00.000Z");
+      // End-of-day version used for DB queries so records created during period_end are included
+      const periodEndForStorage = new Date(body.period_end + "T00:00:00.000Z");
+      const periodEndForQuery = new Date(body.period_end + "T23:59:59.999Z");
 
-      if (isNaN(periodStart.getTime()) || isNaN(periodEnd.getTime())) {
+      if (isNaN(periodStart.getTime()) || isNaN(periodEndForStorage.getTime())) {
         return reply.status(422).send({
           error: "INVALID_DATE",
           message: "period_start and period_end must be valid calendar dates",
@@ -98,7 +101,7 @@ export default async function insightsRoutes(app: FastifyInstance) {
         });
       }
 
-      const periodError = validateReportPeriod(periodStart, periodEnd);
+      const periodError = validateReportPeriod(periodStart, periodEndForStorage);
       if (periodError) {
         return reply.status(422).send({
           error: periodError.code,
@@ -123,7 +126,7 @@ export default async function insightsRoutes(app: FastifyInstance) {
 
       // Validate minimum data (synchronous check before creating the record)
       try {
-        await aggregatePatientData(body.patient_id, periodStart, periodEnd);
+        await aggregatePatientData(body.patient_id, periodStart, periodEndForQuery);
       } catch (err) {
         if (err instanceof Error && (err as { code?: string }).code === "INSUFFICIENT_DATA") {
           return reply.status(422).send({
@@ -145,7 +148,7 @@ export default async function insightsRoutes(app: FastifyInstance) {
         requestedByUserId: request.jwtUser.sub,
         reportType: body.report_type,
         periodStart,
-        periodEnd,
+        periodEnd: periodEndForStorage,
       });
 
       const correlationId = request.id;
@@ -153,7 +156,11 @@ export default async function insightsRoutes(app: FastifyInstance) {
       // Fire-and-forget background AI analysis
       void (async () => {
         try {
-          const aggregation = await aggregatePatientData(body.patient_id, periodStart, periodEnd);
+          const aggregation = await aggregatePatientData(
+            body.patient_id,
+            periodStart,
+            periodEndForQuery,
+          );
           const aiResult = await callAnalyze({
             request_id: correlationId,
             patient_profile_id: body.patient_id,
