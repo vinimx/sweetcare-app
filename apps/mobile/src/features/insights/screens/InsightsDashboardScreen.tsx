@@ -10,9 +10,9 @@ import {
 } from "react-native";
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { tokenStorage } from "../../../infrastructure/storage/secure-storage.js";
+import { apiClient, ApiError } from "../../../infrastructure/api/client.js";
 
-const API_BASE = process.env["EXPO_PUBLIC_API_URL"] ?? "http://localhost:3000/api/v1";
+const CONSENT_TEXT_VERSION = "1.0.0";
 
 const REPORT_TYPE_LABELS: Record<string, string> = {
   weekly_summary: "Resumo Semanal",
@@ -48,27 +48,13 @@ interface Props {
   onSelectReport?: (reportId: string) => void;
 }
 
-async function authedFetch(
-  path: string,
-  options?: { method?: string; body?: string },
-): Promise<Response> {
-  const token = await tokenStorage.getAccessToken();
-  return fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-}
-
 function useInsightReports(patientId: string) {
   return useQuery({
     queryKey: ["insight-reports", patientId],
     queryFn: async (): Promise<ReportSummary[]> => {
-      const res = await authedFetch(`/insights/reports?patient_id=${patientId}`);
-      if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
-      const data = (await res.json()) as { reports: ReportSummary[] };
+      const data = await apiClient.get<{ reports: ReportSummary[] }>(
+        `/insights/reports?patient_id=${patientId}`,
+      );
       return data.reports;
     },
     refetchInterval: (query) => {
@@ -81,21 +67,11 @@ function useInsightReports(patientId: string) {
 function useRequestReport(patientId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (params: {
-      report_type: string;
-      period_start: string;
-      period_end: string;
-    }) => {
-      const res = await authedFetch("/insights/reports", {
-        method: "POST",
-        body: JSON.stringify({ patient_id: patientId, ...params }),
-      });
-      if (!res.ok) {
-        const err = (await res.json()) as { error?: string; message?: string };
-        throw new Error(err.message ?? `HTTP ${String(res.status)}`);
-      }
-      return (await res.json()) as { report_id: string; status: string };
-    },
+    mutationFn: (params: { report_type: string; period_start: string; period_end: string }) =>
+      apiClient.post<{ report_id: string; status: string }>("/insights/reports", {
+        patient_id: patientId,
+        ...params,
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["insight-reports", patientId] });
     },
@@ -113,6 +89,8 @@ function periodForLastDays(days: number): { period_start: string; period_end: st
 
 export default function InsightsDashboardScreen({ patientId, onSelectReport }: Props) {
   const [selectedType, setSelectedType] = useState<string>("weekly_summary");
+  const [needsConsent, setNeedsConsent] = useState(false);
+  const [grantingConsent, setGrantingConsent] = useState(false);
   const { data: reports, isLoading, isRefetching, refetch } = useInsightReports(patientId);
   const requestReport = useRequestReport(patientId);
 
@@ -122,6 +100,10 @@ export default function InsightsDashboardScreen({ patientId, onSelectReport }: P
       { report_type: selectedType, ...period },
       {
         onError: (err) => {
+          if (err instanceof ApiError && err.code === "CONSENT_REQUIRED") {
+            setNeedsConsent(true);
+            return;
+          }
           Alert.alert(
             "Erro",
             err instanceof Error ? err.message : "Não foi possível solicitar o relatório.",
@@ -130,6 +112,22 @@ export default function InsightsDashboardScreen({ patientId, onSelectReport }: P
       },
     );
   }, [selectedType, requestReport]);
+
+  const handleGrantConsent = useCallback(async () => {
+    setGrantingConsent(true);
+    try {
+      await apiClient.post("/consent", {
+        patient_profile_id: patientId,
+        consent_type: "ai_analysis",
+        consent_text_version: CONSENT_TEXT_VERSION,
+      });
+      setNeedsConsent(false);
+    } catch {
+      Alert.alert("Erro", "Não foi possível ativar a análise de IA. Tente novamente.");
+    } finally {
+      setGrantingConsent(false);
+    }
+  }, [patientId]);
 
   return (
     <ScrollView
@@ -154,6 +152,32 @@ export default function InsightsDashboardScreen({ patientId, onSelectReport }: P
           profissional de saúde habilitado.
         </Text>
       </View>
+
+      {/* Consent required — shown after first CONSENT_REQUIRED 403 */}
+      {needsConsent && (
+        <View style={styles.consentBanner} accessibilityRole="alert">
+          <Text style={styles.consentTitle}>Autorização necessária</Text>
+          <Text style={styles.consentBody}>
+            Para gerar relatórios com análise de IA, é necessário autorizar o processamento de dados
+            do paciente para este fim.
+          </Text>
+          <TouchableOpacity
+            style={[styles.consentButton, grantingConsent && styles.buttonDisabled]}
+            onPress={() => {
+              void handleGrantConsent();
+            }}
+            disabled={grantingConsent}
+            accessibilityRole="button"
+            accessibilityLabel="Autorizar análise de IA"
+          >
+            {grantingConsent ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Autorizar análise</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Request new report */}
       <View style={styles.section}>
@@ -258,6 +282,25 @@ const styles = StyleSheet.create({
     borderLeftColor: "#EAB308",
   },
   disclaimerText: { fontSize: 13, color: "#713F12", lineHeight: 18 },
+  consentBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 16,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  consentTitle: { fontSize: 15, fontWeight: "700", color: "#1E40AF", marginBottom: 6 },
+  consentBody: { fontSize: 13, color: "#1E40AF", lineHeight: 18, marginBottom: 12 },
+  consentButton: {
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 16,
+  },
   section: { margin: 16 },
   sectionTitle: { fontSize: 18, fontWeight: "600", color: "#111827", marginBottom: 12 },
   typeRow: { marginBottom: 12 },

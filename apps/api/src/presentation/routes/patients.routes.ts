@@ -165,6 +165,20 @@ export default async function patientsRoutes(app: FastifyInstance) {
           select: { id: true },
         });
 
+        // Auto-grant ai_analysis consent so insights work immediately after patient creation
+        await tx.consentRecord.create({
+          data: {
+            guardianUserId: jwtUser.sub,
+            patientProfileId: patient.id,
+            consentType: "ai_analysis",
+            grantedAt: new Date(),
+            consentTextVersion: CONSENT_TEXT_VERSION,
+            ipAddressHash: hashSensitive(ipAddress),
+            userAgentHash: hashSensitive(userAgent),
+          },
+          select: { id: true },
+        });
+
         return { patient, consent };
       });
 

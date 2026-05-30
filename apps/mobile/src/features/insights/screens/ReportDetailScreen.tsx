@@ -7,9 +7,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { tokenStorage } from "../../../infrastructure/storage/secure-storage.js";
-
-const API_BASE = process.env["EXPO_PUBLIC_API_URL"] ?? "http://localhost:3000/api/v1";
+import { apiClient } from "../../../infrastructure/api/client.js";
 
 const CONFIDENCE_COLORS: Record<string, string> = {
   low: "#DC2626",
@@ -79,24 +77,11 @@ interface Props {
   onBack?: () => void;
 }
 
-async function authedFetch(path: string): Promise<Response> {
-  const token = await tokenStorage.getAccessToken();
-  return fetch(`${API_BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-}
-
 function useReportDetail(reportId: string) {
   return useQuery({
     queryKey: ["insight-report", reportId],
-    queryFn: async (): Promise<ReportDetail> => {
-      const res = await authedFetch(`/insights/reports/${reportId}`);
-      if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
-      return res.json() as Promise<ReportDetail>;
-    },
+    queryFn: (): Promise<ReportDetail> =>
+      apiClient.get<ReportDetail>(`/insights/reports/${reportId}`),
     refetchInterval: (query) => (query.state.data?.status === "processing" ? 3000 : false),
   });
 }

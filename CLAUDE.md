@@ -1301,4 +1301,20 @@ Solução: Duas queries diretas e separadas — (1) `caregiverAssignment.findMan
 Impacto: `patients.routes.ts` — handler de `GET /patients`; sem mudança de contrato de API; todos os outros endpoints de `patientProfile` já usavam queries diretas e estavam corretos.
 Padrão a seguir: **nunca usar `include` para cruzar um modelo que tem PHI com outro** — sempre fazer duas queries separadas ou um `select` no modelo PHI diretamente.
 
-_Última atualização: 2026-05-30 — Fix PHI decrypt em GET /patients (fullName cifrado na UI)_
+### 2026-05-30 — Fix: aba Insights — autenticação + consentimento ai_analysis
+
+**Fix 1: `InsightsDashboardScreen` e `ReportDetailScreen` usavam `authedFetch` (raw fetch)**
+Motivação: As duas telas de insights usavam uma função local `authedFetch` que lia o access token diretamente via `tokenStorage.getAccessToken()` sem nenhuma lógica de refresh. Quando o token de 15 minutos expirava, todas as chamadas falhavam permanentemente com "Valid access token required" — o usuário precisava fazer logout e login novamente para recuperar o acesso.
+Solução: Substituído `authedFetch` + `tokenStorage` por `apiClient.get` / `apiClient.post` em ambas as telas. O `apiClient` já implementa o ciclo 401 → refresh → retry automaticamente via `setRefreshListener`. Remoção de `API_BASE` hardcoded — `apiClient` já usa `EXPO_PUBLIC_API_URL`.
+Impacto: `InsightsDashboardScreen.tsx` e `ReportDetailScreen.tsx` — sem mudança de contrato de API; sem nova dependência.
+
+**Fix 2: `POST /insights/reports` sempre retornava 403 CONSENT_REQUIRED**
+Motivação: O endpoint `POST /insights/reports` exige consentimento `ai_analysis` ativo. Apenas `data_processing` era auto-concedido na criação do paciente — `ai_analysis` nunca era concedido, bloqueando 100% das tentativas de geração de relatório.
+Solução A (novos pacientes): `POST /patients` agora concede `ai_analysis` na mesma `$transaction` que `data_processing` — dois `consentRecord.create()` atômicos. Pacientes criados a partir desta versão já têm ambos os consentimentos.
+Solução B (pacientes existentes): `InsightsDashboardScreen` detecta `ApiError.code === "CONSENT_REQUIRED"` (403) e exibe um banner inline com botão "Autorizar análise" → chama `POST /consent` com `{ patient_profile_id, consent_type: "ai_analysis", consent_text_version: "1.0.0" }` → fecha o banner → usuário pode solicitar o relatório normalmente.
+Impacto: `patients.routes.ts` — POST /patients cria dois ConsentRecord por paciente; `InsightsDashboardScreen.tsx` — estado `needsConsent` + `grantingConsent` + handler `handleGrantConsent`.
+
+**Padrão estabelecido: todas as telas mobile devem usar `apiClient` — nunca `fetch` bruto**
+Razão: `apiClient` é o único ponto que faz refresh automático de token. Qualquer tela que usa `fetch` diretamente ou `tokenStorage.getAccessToken()` sem refresh vai falhar silenciosamente após 15 minutos.
+
+_Última atualização: 2026-05-30 — Fix Insights: apiClient + auto-grant ai_analysis consent + consent UI_
