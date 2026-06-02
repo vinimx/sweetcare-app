@@ -1,4 +1,5 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, preHandlerHookHandler } from "fastify";
+import { type ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { syncBatchSchema, resolveConflictSchema } from "@sweetcare/shared-validation";
 import { requirePatientAccess } from "../../infrastructure/auth/rbac.middleware.js";
@@ -32,7 +33,8 @@ const conflictSummarySchema = z.object({
   oldest_conflict_at: z.string(),
 });
 
-export default async function syncRoutes(app: FastifyInstance) {
+export default async function syncRoutes(baseApp: FastifyInstance) {
+  const app = baseApp.withTypeProvider<ZodTypeProvider>();
   // POST /sync/batch
   app.post(
     "/sync/batch",
@@ -69,7 +71,7 @@ export default async function syncRoutes(app: FastifyInstance) {
   app.get(
     "/sync/status/:patientId",
     {
-      preHandler: [app.authenticate, requirePatientAccess],
+      preHandler: [app.authenticate, requirePatientAccess as preHandlerHookHandler],
       schema: {
         params: z.object({ patientId: z.string().uuid() }),
         response: {
@@ -84,7 +86,7 @@ export default async function syncRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { patientId } = request.params as { patientId: string };
+      const { patientId } = request.params;
       const result = await getSyncStatus(patientId, request.jwtUser.sub);
       return reply.status(200).send(result);
     },

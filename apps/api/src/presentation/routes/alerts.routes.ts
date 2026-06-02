@@ -1,4 +1,5 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, preHandlerHookHandler } from "fastify";
+import { type ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { requirePatientAccess } from "../../infrastructure/auth/rbac.middleware.js";
 import { checkPatientAccess, isReadOnly } from "../../domain/services/caregiver-access.guard.js";
@@ -54,12 +55,13 @@ const listQuerySchema = z.object({
   cursor: z.string().optional(),
 });
 
-export default async function alertsRoutes(app: FastifyInstance) {
+export default async function alertsRoutes(baseApp: FastifyInstance) {
+  const app = baseApp.withTypeProvider<ZodTypeProvider>();
   // GET /patients/:patientId/alerts
   app.get(
     "/patients/:patientId/alerts",
     {
-      preHandler: [app.authenticate, requirePatientAccess],
+      preHandler: [app.authenticate, requirePatientAccess as preHandlerHookHandler],
       schema: {
         params: z.object({ patientId: z.string().uuid() }),
         querystring: listQuerySchema,
@@ -73,8 +75,8 @@ export default async function alertsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { patientId } = request.params as { patientId: string };
-      const query = request.query as z.infer<typeof listQuerySchema>;
+      const { patientId } = request.params;
+      const query = request.query;
 
       const result = await getPatientAlerts(patientId, {
         status: query.status,
@@ -115,7 +117,7 @@ export default async function alertsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { alertId } = request.params as { alertId: string };
+      const { alertId } = request.params;
 
       const alert = await getAlertById(alertId);
       // Return 404 for both "not found" and "no access" to prevent alert ID enumeration.
@@ -171,7 +173,7 @@ export default async function alertsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { alertId } = request.params as { alertId: string };
+      const { alertId } = request.params;
 
       const alert = await getAlertById(alertId);
       // Return 404 for both "not found" and "no access" to prevent alert ID enumeration.

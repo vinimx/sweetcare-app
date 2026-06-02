@@ -1,4 +1,5 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, preHandlerHookHandler } from "fastify";
+import { type ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { requirePatientAccess } from "../../infrastructure/auth/rbac.middleware.js";
 import { getPatientInsulinRecords } from "../../infrastructure/repositories/insulin-record.repository.js";
@@ -53,12 +54,13 @@ const listQuerySchema = z.object({
   cursor: z.string().optional(),
 });
 
-export default async function timelineRoutes(app: FastifyInstance) {
+export default async function timelineRoutes(baseApp: FastifyInstance) {
+  const app = baseApp.withTypeProvider<ZodTypeProvider>();
   // GET /patients/:patientId/timeline
   app.get(
     "/patients/:patientId/timeline",
     {
-      preHandler: [app.authenticate, requirePatientAccess],
+      preHandler: [app.authenticate, requirePatientAccess as preHandlerHookHandler],
       schema: {
         params: z.object({ patientId: z.string().uuid() }),
         querystring: listQuerySchema,
@@ -74,8 +76,8 @@ export default async function timelineRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { patientId } = request.params as { patientId: string };
-      const query = request.query as z.infer<typeof listQuerySchema>;
+      const { patientId } = request.params;
+      const query = request.query;
 
       const requestedTypes = query.types
         ? new Set(query.types.split(",").map((t) => t.trim()))

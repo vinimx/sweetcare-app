@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyError } from "fastify";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import { ZodError } from "zod";
 
@@ -74,7 +74,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(import("./presentation/routes/monitoring.routes.js"));
 
   // ── Global error handler ─────────────────────────────────────────────────
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler((error: FastifyError, request, reply) => {
     const correlationId = request.id;
 
     if (error.validation || error instanceof ZodError) {

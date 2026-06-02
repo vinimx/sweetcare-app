@@ -49,10 +49,18 @@ function createEncryptingPrisma(base: PrismaClient) {
   return base.$extends({
     query: {
       $allModels: {
-        async $allOperations({ model, operation, args, query }) {
-          const modelKey = model
-            ? (model as string).charAt(0).toLowerCase() + (model as string).slice(1)
-            : "";
+        async $allOperations({
+          model,
+          operation,
+          args,
+          query,
+        }: {
+          model: string | undefined;
+          operation: string;
+          args: Record<string, unknown>;
+          query: (args: Record<string, unknown>) => Promise<unknown>;
+        }) {
+          const modelKey = model ? model.charAt(0).toLowerCase() + model.slice(1) : "";
 
           // Encrypt before write
           if (["create", "update", "upsert"].includes(operation) && args.data) {
@@ -93,7 +101,8 @@ function createEncryptingPrisma(base: PrismaClient) {
 
 // ─── Singleton ───────────────────────────────────────────────────────────────
 let _base: PrismaClient | null = null;
-let _client: PrismaClient | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _client: any = null;
 
 export function getPrismaClient(): PrismaClient {
   if (!_client) {
@@ -105,13 +114,19 @@ export function getPrismaClient(): PrismaClient {
       errorFormat: "minimal",
     });
 
-    _base.$on("error", (e) => {
+    // $on is available on the base PrismaClient for event-emit log levels.
+    // Cast through unknown to avoid strict overload mismatch in Prisma 6 types.
+    (
+      _base as unknown as {
+        $on: (event: string, cb: (e: { target: string; message: string }) => void) => void;
+      }
+    ).$on("error", (e) => {
       logger.error({ target: e.target, message: e.message }, "DB error");
     });
 
     _client = createEncryptingPrisma(_base);
   }
-  return _client;
+  return _client as PrismaClient;
 }
 
 export async function disconnectPrisma(): Promise<void> {

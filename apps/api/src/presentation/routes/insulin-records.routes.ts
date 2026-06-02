@@ -1,4 +1,5 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, preHandlerHookHandler } from "fastify";
+import { type ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { createInsulinRecordSchema } from "@sweetcare/shared-validation";
 import {
@@ -42,12 +43,17 @@ const listQuerySchema = z.object({
   cursor: z.string().optional(),
 });
 
-export default async function insulinRecordsRoutes(app: FastifyInstance) {
+export default async function insulinRecordsRoutes(baseApp: FastifyInstance) {
+  const app = baseApp.withTypeProvider<ZodTypeProvider>();
   // POST /patients/:patientId/insulin-records
   app.post(
     "/patients/:patientId/insulin-records",
     {
-      preHandler: [app.authenticate, requirePatientAccess, requireWriteAccess],
+      preHandler: [
+        app.authenticate,
+        requirePatientAccess as preHandlerHookHandler,
+        requireWriteAccess as preHandlerHookHandler,
+      ],
       schema: {
         params: z.object({ patientId: z.string().uuid() }),
         body: createInsulinRecordSchema,
@@ -70,7 +76,7 @@ export default async function insulinRecordsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { patientId } = request.params as { patientId: string };
+      const { patientId } = request.params;
       const body = request.body;
 
       const { record, isNew } = await createInsulinRecord(
@@ -81,10 +87,14 @@ export default async function insulinRecordsRoutes(app: FastifyInstance) {
           insulinType: body.insulin_type,
           doseUnits: body.dose_units,
           doseRationale: body.dose_rationale,
-          mealCarbsGrams: body.meal_carbs_grams,
-          glucoseBeforeMgdl: body.glucose_before_mgdl,
-          administrationSite: body.administration_site,
-          notes: body.notes,
+          ...(body.meal_carbs_grams !== undefined && { mealCarbsGrams: body.meal_carbs_grams }),
+          ...(body.glucose_before_mgdl !== undefined && {
+            glucoseBeforeMgdl: body.glucose_before_mgdl,
+          }),
+          ...(body.administration_site !== undefined && {
+            administrationSite: body.administration_site,
+          }),
+          ...(body.notes !== undefined && { notes: body.notes }),
           appliedAt: new Date(body.applied_at),
           timezone: body.timezone,
         },
@@ -110,7 +120,11 @@ export default async function insulinRecordsRoutes(app: FastifyInstance) {
   app.patch(
     "/patients/:patientId/insulin-records/:recordId",
     {
-      preHandler: [app.authenticate, requirePatientAccess, requireWriteAccess],
+      preHandler: [
+        app.authenticate,
+        requirePatientAccess as preHandlerHookHandler,
+        requireWriteAccess as preHandlerHookHandler,
+      ],
       schema: {
         params: z.object({ patientId: z.string().uuid(), recordId: z.string().uuid() }),
         body: z.object({
@@ -133,7 +147,7 @@ export default async function insulinRecordsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { patientId, recordId } = request.params as { patientId: string; recordId: string };
+      const { patientId, recordId } = request.params;
       const body = request.body as {
         insulin_type?: string;
         dose_units?: number;
@@ -148,13 +162,17 @@ export default async function insulinRecordsRoutes(app: FastifyInstance) {
         recordId,
         patientId,
         {
-          insulinType: body.insulin_type,
-          doseUnits: body.dose_units,
-          doseRationale: body.dose_rationale,
-          mealCarbsGrams: body.meal_carbs_grams,
-          glucoseBeforeMgdl: body.glucose_before_mgdl,
-          administrationSite: body.administration_site,
-          notes: body.notes,
+          ...(body.insulin_type !== undefined && { insulinType: body.insulin_type }),
+          ...(body.dose_units !== undefined && { doseUnits: body.dose_units }),
+          ...(body.dose_rationale !== undefined && { doseRationale: body.dose_rationale }),
+          ...(body.meal_carbs_grams !== undefined && { mealCarbsGrams: body.meal_carbs_grams }),
+          ...(body.glucose_before_mgdl !== undefined && {
+            glucoseBeforeMgdl: body.glucose_before_mgdl,
+          }),
+          ...(body.administration_site !== undefined && {
+            administrationSite: body.administration_site,
+          }),
+          ...(body.notes !== undefined && { notes: body.notes }),
         },
         {
           actorUserId: request.jwtUser.sub,
@@ -172,7 +190,11 @@ export default async function insulinRecordsRoutes(app: FastifyInstance) {
   app.delete(
     "/patients/:patientId/insulin-records/:recordId",
     {
-      preHandler: [app.authenticate, requirePatientAccess, requireWriteAccess],
+      preHandler: [
+        app.authenticate,
+        requirePatientAccess as preHandlerHookHandler,
+        requireWriteAccess as preHandlerHookHandler,
+      ],
       schema: {
         params: z.object({ patientId: z.string().uuid(), recordId: z.string().uuid() }),
         response: {
@@ -183,7 +205,7 @@ export default async function insulinRecordsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { patientId, recordId } = request.params as { patientId: string; recordId: string };
+      const { patientId, recordId } = request.params;
 
       await deleteInsulinRecord(recordId, patientId, {
         actorUserId: request.jwtUser.sub,
@@ -200,7 +222,7 @@ export default async function insulinRecordsRoutes(app: FastifyInstance) {
   app.get(
     "/patients/:patientId/insulin-records",
     {
-      preHandler: [app.authenticate, requirePatientAccess],
+      preHandler: [app.authenticate, requirePatientAccess as preHandlerHookHandler],
       schema: {
         params: z.object({ patientId: z.string().uuid() }),
         querystring: listQuerySchema,
@@ -215,14 +237,14 @@ export default async function insulinRecordsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { patientId } = request.params as { patientId: string };
-      const query = request.query as z.infer<typeof listQuerySchema>;
+      const { patientId } = request.params;
+      const query = request.query;
 
       const result = await listInsulinRecords(patientId, {
-        from: query.from ? new Date(query.from) : undefined,
-        to: query.to ? new Date(query.to) : undefined,
+        ...(query.from ? { from: new Date(query.from) } : {}),
+        ...(query.to ? { to: new Date(query.to) } : {}),
         limit: query.limit,
-        cursor: query.cursor,
+        ...(query.cursor ? { cursor: query.cursor } : {}),
       });
 
       return reply.status(200).send({
@@ -230,11 +252,11 @@ export default async function insulinRecordsRoutes(app: FastifyInstance) {
           record_id: r.id,
           client_id: r.clientId,
           patient_profile_id: r.patientProfileId,
-          insulin_type: r.insulinType,
+          insulin_type: (r.insulinType as string | null) ?? "",
           dose_units: Number(r.doseUnits),
           dose_rationale: r.doseRationale,
           meal_carbs_grams: r.mealCarbsGrams,
-          glucose_before_mgdl: r.glucoseBeforeMgdl,
+          glucose_before_mgdl: r.glucoseBeforeMgdl != null ? Number(r.glucoseBeforeMgdl) : null,
           administration_site: r.administrationSite,
           notes: r.notes,
           applied_at: r.appliedAt.toISOString(),

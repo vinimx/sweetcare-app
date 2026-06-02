@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { getPrismaClient } from "../../infrastructure/database/client.js";
 import { verifyPassword } from "../../infrastructure/auth/password.service.js";
 import { revokeAllUserSessions } from "../../infrastructure/auth/session.repository.js";
@@ -166,12 +167,12 @@ export async function exportUserData(userId: string, ctx: AuditContext): Promise
     user: {
       user_id: user.id,
       email: user.email,
-      display_name: (user.displayName as string | null) ?? null,
-      phone_e164: (user.phoneE164 as string | null) ?? null,
+      display_name: user.displayName ?? null,
+      phone_e164: user.phoneE164 ?? null,
       role: user.role,
       created_at: user.createdAt.toISOString(),
     },
-    consent_records: consentRecords.map((c) => ({
+    consent_records: consentRecords.map((c: (typeof consentRecords)[number]) => ({
       consent_id: c.id,
       consent_type: c.consentType,
       patient_profile_id: c.patientProfileId,
@@ -179,24 +180,24 @@ export async function exportUserData(userId: string, ctx: AuditContext): Promise
       revoked_at: c.revokedAt?.toISOString() ?? null,
       consent_text_version: c.consentTextVersion,
     })),
-    caregiver_assignments: assignments.map((a) => ({
+    caregiver_assignments: assignments.map((a: (typeof assignments)[number]) => ({
       assignment_id: a.id,
       patient_profile_id: a.patientProfileId,
       assignment_role: a.assignmentRole,
       granted_at: a.grantedAt.toISOString(),
       revoked_at: a.revokedAt?.toISOString() ?? null,
     })),
-    patients: patients.map((p) => ({
+    patients: patients.map((p: (typeof patients)[number]) => ({
       patient_id: p.id,
       full_name: (p.fullName as string | null) ?? null,
       date_of_birth: p.dateOfBirth.toISOString().split("T")[0] ?? "",
       diagnosis_year: p.diagnosisYear,
       target_glucose_min_mgdl: p.targetGlucoseMinMgdl,
       target_glucose_max_mgdl: p.targetGlucoseMaxMgdl,
-      insulin_type_basal: (p.insulinTypeBasal as string | null) ?? null,
-      insulin_type_bolus: (p.insulinTypeBolus as string | null) ?? null,
+      insulin_type_basal: p.insulinTypeBasal ?? null,
+      insulin_type_bolus: p.insulinTypeBolus ?? null,
       created_at: p.createdAt.toISOString(),
-      insulin_records: p.insulinRecords.map((r) => ({
+      insulin_records: p.insulinRecords.map((r: (typeof p.insulinRecords)[number]) => ({
         record_id: r.id,
         client_id: r.clientId,
         insulin_type: (r.insulinType as string | null) ?? null,
@@ -205,23 +206,23 @@ export async function exportUserData(userId: string, ctx: AuditContext): Promise
         meal_carbs_grams: r.mealCarbsGrams,
         glucose_before_mgdl: r.glucoseBeforeMgdl !== null ? Number(r.glucoseBeforeMgdl) : null,
         administration_site: r.administrationSite,
-        notes: (r.notes as string | null) ?? null,
+        notes: r.notes ?? null,
         applied_at: r.appliedAt.toISOString(),
         timezone: r.timezone,
         recorded_at: r.recordedAt.toISOString(),
       })),
-      symptom_records: p.symptomRecords.map((r) => ({
+      symptom_records: p.symptomRecords.map((r: (typeof p.symptomRecords)[number]) => ({
         record_id: r.id,
         client_id: r.clientId,
-        symptom_codes: r.symptomCodes as string[],
+        symptom_codes: r.symptomCodes,
         severity_level: r.severityLevel,
         glucose_reading_mgdl: r.glucoseReadingMgdl !== null ? Number(r.glucoseReadingMgdl) : null,
-        notes: (r.notes as string | null) ?? null,
+        notes: r.notes ?? null,
         observed_at: r.observedAt.toISOString(),
         timezone: r.timezone,
         recorded_at: r.recordedAt.toISOString(),
       })),
-      alerts: p.alertEvents.map((a) => ({
+      alerts: p.alertEvents.map((a: (typeof p.alertEvents)[number]) => ({
         alert_id: a.id,
         alert_type: a.alertType,
         severity_level: a.severityLevel,
@@ -229,14 +230,14 @@ export async function exportUserData(userId: string, ctx: AuditContext): Promise
         created_at: a.createdAt.toISOString(),
         resolved_at: a.resolvedAt?.toISOString() ?? null,
       })),
-      insight_reports: p.insightReports.map((r) => ({
+      insight_reports: p.insightReports.map((r: (typeof p.insightReports)[number]) => ({
         report_id: r.id,
         report_type: r.reportType,
         status: r.status,
         period_start: r.periodStart.toISOString().split("T")[0] ?? "",
         period_end: r.periodEnd.toISOString().split("T")[0] ?? "",
         generated_at: r.generatedAt.toISOString(),
-        summary_text: (r.summaryText as string | null) ?? null,
+        summary_text: r.summaryText ?? null,
       })),
     })),
   };
@@ -274,9 +275,9 @@ export async function deleteUserAccount(
       where: { createdByUserId: userId },
       select: { id: true },
     })
-  ).map((p) => p.id);
+  ).map((p: { id: string }) => p.id);
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     if (patientIds.length > 0) {
       await tx.insightReport.deleteMany({
         where: { patientProfileId: { in: patientIds } },
@@ -324,7 +325,7 @@ export async function deleteUserAccount(
       });
     }
 
-    await revokeAllUserSessions(userId, "account_deletion");
+    await revokeAllUserSessions(userId, "logout");
 
     // Anonymize instead of hard-deleting to preserve FK integrity for AuditEntry records.
     await tx.user.update({

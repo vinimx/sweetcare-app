@@ -32,7 +32,8 @@ export async function upsertSymptomRecord(
       recordedByUserId: input.recordedByUserId,
       symptomCodes: input.symptomCodes,
       severityLevel: input.severityLevel,
-      glucoseReadingMgdl: input.glucoseReadingMgdl ?? null,
+      glucoseReadingMgdl:
+        input.glucoseReadingMgdl != null ? String(input.glucoseReadingMgdl) : null,
       notes: input.notes ?? null,
       observedAt: input.observedAt,
       timezone: input.timezone,
@@ -65,7 +66,10 @@ export async function updateSymptomRecord(
     data: {
       ...(data.symptomCodes !== undefined && { symptomCodes: data.symptomCodes }),
       ...(data.severityLevel !== undefined && { severityLevel: data.severityLevel }),
-      ...(data.glucoseReadingMgdl !== undefined && { glucoseReadingMgdl: data.glucoseReadingMgdl }),
+      ...(data.glucoseReadingMgdl !== undefined && {
+        glucoseReadingMgdl:
+          data.glucoseReadingMgdl != null ? String(data.glucoseReadingMgdl) : null,
+      }),
       ...(data.notes !== undefined && { notes: data.notes }),
     },
   });

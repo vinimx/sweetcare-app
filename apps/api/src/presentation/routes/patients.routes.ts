@@ -1,8 +1,10 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, preHandlerHookHandler } from "fastify";
+import { type ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { createPatientSchema } from "@sweetcare/shared-validation";
 import { CONSENT_TEXT_VERSION } from "@sweetcare/shared-config";
 import { getPrismaClient } from "../../infrastructure/database/client.js";
+import { type Prisma } from "@prisma/client";
 import { hashSensitive } from "../../infrastructure/database/encryption-middleware.js";
 import { auditCreate, auditUpdate } from "../../application/audit/audit.service.js";
 import {
@@ -81,7 +83,8 @@ const PATIENT_SELECT = {
   updatedAt: true,
 } as const;
 
-export default async function patientsRoutes(app: FastifyInstance) {
+export default async function patientsRoutes(baseApp: FastifyInstance) {
+  const app = baseApp.withTypeProvider<ZodTypeProvider>();
   // POST /patients
   app.post(
     "/patients",
@@ -123,64 +126,66 @@ export default async function patientsRoutes(app: FastifyInstance) {
       const ipAddress = request.ip ?? "unknown";
       const userAgent = request.headers["user-agent"] ?? "unknown";
 
-      const { patient, consent } = await prisma.$transaction(async (tx) => {
-        const patient = await tx.patientProfile.create({
-          data: {
-            fullName: body.full_name,
-            dateOfBirth: new Date(body.date_of_birth),
-            diagnosisYear: body.diagnosis_year,
-            targetGlucoseMinMgdl: body.target_glucose_min_mgdl,
-            targetGlucoseMaxMgdl: body.target_glucose_max_mgdl,
-            insulinTypeBasal: body.insulin_type_basal ?? null,
-            insulinTypeBolus: body.insulin_type_bolus ?? null,
-            icrUnitsPerGramCarb: body.icr_units_per_gram_carb ?? null,
-            isfMgdlPerUnit: body.isf_mgdl_per_unit ?? null,
-            createdByUserId: jwtUser.sub,
-          },
-          select: PATIENT_SELECT,
-        });
+      const { patient, consent } = await prisma.$transaction(
+        async (tx: Prisma.TransactionClient) => {
+          const patient = await tx.patientProfile.create({
+            data: {
+              fullName: body.full_name,
+              dateOfBirth: new Date(body.date_of_birth),
+              diagnosisYear: body.diagnosis_year,
+              targetGlucoseMinMgdl: body.target_glucose_min_mgdl,
+              targetGlucoseMaxMgdl: body.target_glucose_max_mgdl,
+              insulinTypeBasal: body.insulin_type_basal ?? null,
+              insulinTypeBolus: body.insulin_type_bolus ?? null,
+              icrUnitsPerGramCarb: body.icr_units_per_gram_carb ?? null,
+              isfMgdlPerUnit: body.isf_mgdl_per_unit ?? null,
+              createdByUserId: jwtUser.sub,
+            },
+            select: PATIENT_SELECT,
+          });
 
-        // Auto-create primary guardian assignment
-        await tx.caregiverAssignment.create({
-          data: {
-            patientProfileId: patient.id,
-            userId: jwtUser.sub,
-            assignmentRole: "primary_guardian",
-            grantedByUserId: jwtUser.sub,
-            grantedAt: new Date(),
-          },
-        });
+          // Auto-create primary guardian assignment
+          await tx.caregiverAssignment.create({
+            data: {
+              patientProfileId: patient.id,
+              userId: jwtUser.sub,
+              assignmentRole: "primary_guardian",
+              grantedByUserId: jwtUser.sub,
+              grantedAt: new Date(),
+            },
+          });
 
-        // Auto-grant data_processing consent (LGPD Art. 14)
-        const consent = await tx.consentRecord.create({
-          data: {
-            guardianUserId: jwtUser.sub,
-            patientProfileId: patient.id,
-            consentType: "data_processing",
-            grantedAt: new Date(),
-            consentTextVersion: CONSENT_TEXT_VERSION,
-            ipAddressHash: hashSensitive(ipAddress),
-            userAgentHash: hashSensitive(userAgent),
-          },
-          select: { id: true },
-        });
+          // Auto-grant data_processing consent (LGPD Art. 14)
+          const consent = await tx.consentRecord.create({
+            data: {
+              guardianUserId: jwtUser.sub,
+              patientProfileId: patient.id,
+              consentType: "data_processing",
+              grantedAt: new Date(),
+              consentTextVersion: CONSENT_TEXT_VERSION,
+              ipAddressHash: hashSensitive(ipAddress),
+              userAgentHash: hashSensitive(userAgent),
+            },
+            select: { id: true },
+          });
 
-        // Auto-grant ai_analysis consent so insights work immediately after patient creation
-        await tx.consentRecord.create({
-          data: {
-            guardianUserId: jwtUser.sub,
-            patientProfileId: patient.id,
-            consentType: "ai_analysis",
-            grantedAt: new Date(),
-            consentTextVersion: CONSENT_TEXT_VERSION,
-            ipAddressHash: hashSensitive(ipAddress),
-            userAgentHash: hashSensitive(userAgent),
-          },
-          select: { id: true },
-        });
+          // Auto-grant ai_analysis consent so insights work immediately after patient creation
+          await tx.consentRecord.create({
+            data: {
+              guardianUserId: jwtUser.sub,
+              patientProfileId: patient.id,
+              consentType: "ai_analysis",
+              grantedAt: new Date(),
+              consentTextVersion: CONSENT_TEXT_VERSION,
+              ipAddressHash: hashSensitive(ipAddress),
+              userAgentHash: hashSensitive(userAgent),
+            },
+            select: { id: true },
+          });
 
-        return { patient, consent };
-      });
+          return { patient, consent };
+        },
+      );
 
       void auditCreate({
         actorUserId: jwtUser.sub,
@@ -235,14 +240,14 @@ export default async function patientsRoutes(app: FastifyInstance) {
   app.get(
     "/patients/:patientId",
     {
-      preHandler: [app.authenticate, requirePatientAccess],
+      preHandler: [app.authenticate, requirePatientAccess as preHandlerHookHandler],
       schema: {
         params: z.object({ patientId: z.string().uuid() }),
         response: { 200: patientProfileSchema, 403: errorSchema, 404: errorSchema },
       },
     },
     async (request, reply) => {
-      const { patientId } = request.params as { patientId: string };
+      const { patientId } = request.params;
       const prisma = getPrismaClient();
 
       const profile = await prisma.patientProfile.findUnique({
@@ -280,7 +285,11 @@ export default async function patientsRoutes(app: FastifyInstance) {
   app.patch(
     "/patients/:patientId",
     {
-      preHandler: [app.authenticate, requirePatientAccess, requireWriteAccess],
+      preHandler: [
+        app.authenticate,
+        requirePatientAccess as preHandlerHookHandler,
+        requireWriteAccess as preHandlerHookHandler,
+      ],
       schema: {
         params: z.object({ patientId: z.string().uuid() }),
         body: updatePatientBodySchema,
@@ -293,7 +302,7 @@ export default async function patientsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { patientId } = request.params as { patientId: string };
+      const { patientId } = request.params;
       const body = request.body;
       const prisma = getPrismaClient();
 

@@ -1,5 +1,6 @@
 import { SYNC_CONFLICT_WINDOW_MINUTES } from "@sweetcare/shared-config";
 import type { SyncBatchInput, ResolveConflictInput } from "@sweetcare/shared-validation";
+import { Prisma } from "@prisma/client";
 import { getPrismaClient } from "../../infrastructure/database/client.js";
 import { validateInsulinRecord } from "../../domain/entities/insulin-application-record.entity.js";
 import { validateSymptomRecord } from "../../domain/entities/symptom-record.entity.js";
@@ -128,10 +129,10 @@ export async function processSyncBatch(
         insulinType: p.insulin_type,
         doseUnits: p.dose_units,
         doseRationale: p.dose_rationale,
-        mealCarbsGrams: p.meal_carbs_grams,
-        glucoseBeforeMgdl: p.glucose_before_mgdl,
-        administrationSite: p.administration_site,
-        notes: p.notes,
+        ...(p.meal_carbs_grams !== undefined && { mealCarbsGrams: p.meal_carbs_grams }),
+        ...(p.glucose_before_mgdl !== undefined && { glucoseBeforeMgdl: p.glucose_before_mgdl }),
+        ...(p.administration_site !== undefined && { administrationSite: p.administration_site }),
+        ...(p.notes !== undefined && { notes: p.notes }),
         appliedAt,
         timezone: p.timezone,
       });
@@ -153,10 +154,10 @@ export async function processSyncBatch(
         insulinType: p.insulin_type,
         doseUnits: p.dose_units,
         doseRationale: p.dose_rationale,
-        mealCarbsGrams: p.meal_carbs_grams,
-        glucoseBeforeMgdl: p.glucose_before_mgdl,
-        administrationSite: p.administration_site,
-        notes: p.notes,
+        ...(p.meal_carbs_grams !== undefined && { mealCarbsGrams: p.meal_carbs_grams }),
+        ...(p.glucose_before_mgdl !== undefined && { glucoseBeforeMgdl: p.glucose_before_mgdl }),
+        ...(p.administration_site !== undefined && { administrationSite: p.administration_site }),
+        ...(p.notes !== undefined && { notes: p.notes }),
         appliedAt,
         timezone: p.timezone,
       });
@@ -187,8 +188,8 @@ export async function processSyncBatch(
         recordedByUserId: ctx.actorUserId,
         symptomCodes: p.symptom_codes,
         severityLevel: p.severity_level,
-        glucoseReadingMgdl: p.glucose_reading_mgdl,
-        notes: p.notes,
+        ...(p.glucose_reading_mgdl !== undefined && { glucoseReadingMgdl: p.glucose_reading_mgdl }),
+        ...(p.notes !== undefined && { notes: p.notes }),
         observedAt,
         timezone: p.timezone,
       });
@@ -209,8 +210,8 @@ export async function processSyncBatch(
         recordedByUserId: ctx.actorUserId,
         symptomCodes: p.symptom_codes,
         severityLevel: p.severity_level,
-        glucoseReadingMgdl: p.glucose_reading_mgdl,
-        notes: p.notes,
+        ...(p.glucose_reading_mgdl !== undefined && { glucoseReadingMgdl: p.glucose_reading_mgdl }),
+        ...(p.notes !== undefined && { notes: p.notes }),
         observedAt,
         timezone: p.timezone,
       });
@@ -250,7 +251,7 @@ export async function processSyncBatch(
     data: {
       recordsCommitted: committed,
       recordsConflicted: conflicts.length,
-      conflictDetails: conflictDetails as object | null,
+      conflictDetails: conflictDetails ?? Prisma.JsonNull,
       status: finalStatus,
       completedAt: new Date(),
     },
@@ -309,13 +310,15 @@ export async function getSyncStatus(
     },
   });
 
+  type SyncEventRow = (typeof recentEvents)[number];
+
   const lastCompleted = recentEvents.find(
-    (e) => e.status === "completed" || e.status === "partial_failure",
+    (e: SyncEventRow) => e.status === "completed" || e.status === "partial_failure",
   );
 
   const pendingConflicts: ConflictSummary[] = recentEvents
-    .filter((e) => e.recordsConflicted > 0 && e.conflictDetails != null)
-    .map((e) => ({
+    .filter((e: SyncEventRow) => e.recordsConflicted > 0 && e.conflictDetails != null)
+    .map((e: SyncEventRow) => ({
       sync_event_id: e.id,
       conflict_count: e.recordsConflicted,
       oldest_conflict_at: e.startedAt.toISOString(),

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import type { AuditOperation } from "@prisma/client";
 import { getPrismaClient } from "../../infrastructure/database/client.js";
 import { hashSensitive } from "../../infrastructure/database/encryption-middleware.js";
@@ -26,7 +27,10 @@ export async function writeAuditEntry(params: AuditParams): Promise<void> {
         operation: params.operation,
         targetTable: params.targetTable,
         targetId: params.targetId,
-        diffSummary: params.diffSummary ?? null,
+        diffSummary:
+          params.diffSummary != null
+            ? (params.diffSummary as unknown as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
         ipAddressHash: hashSensitive(params.ipAddress),
         userAgentHash: hashSensitive(params.userAgent),
       },

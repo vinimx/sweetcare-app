@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { getPrismaClient } from "../database/client.js";
 import type { InsightReport } from "@prisma/client";
 import type { ReportType } from "../../domain/entities/insight-report.entity.js";
@@ -88,8 +89,8 @@ export async function updateReportCompleted(
     data: {
       status: "completed",
       summaryText: data.summaryText,
-      patternFindings: data.patternFindings,
-      confidenceContext: data.confidenceContext,
+      patternFindings: data.patternFindings ?? Prisma.JsonNull,
+      confidenceContext: data.confidenceContext ?? Prisma.JsonNull,
       aiModelVersion: data.aiModelVersion,
     },
   });

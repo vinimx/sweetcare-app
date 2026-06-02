@@ -46,7 +46,7 @@ export async function register(input: RegisterInput): Promise<{ userId: string }
     data: {
       email: input.email,
       passwordHash,
-      role: input.role as UserRole,
+      role: input.role,
       displayName: input.display_name,
       phoneE164: input.phone_e164 ?? null,
     },
@@ -277,8 +277,10 @@ async function createTokenPair(
     userId,
     familyId,
     tokenHash,
-    parentTokenHash: rotation?.parentTokenHash,
-    deviceFingerprint: deviceFingerprint ? hashToken(deviceFingerprint) : undefined,
+    ...(rotation?.parentTokenHash !== undefined
+      ? { parentTokenHash: rotation.parentTokenHash }
+      : {}),
+    ...(deviceFingerprint ? { deviceFingerprint: hashToken(deviceFingerprint) } : {}),
     expiresAt,
   });
 

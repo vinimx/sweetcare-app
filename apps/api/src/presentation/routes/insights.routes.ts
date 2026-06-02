@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { type ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import {
   checkPatientAccess,
@@ -44,7 +45,8 @@ const confidenceContextSchema = z.object({
   model_limitations: z.array(z.string()),
 });
 
-export default async function insightsRoutes(app: FastifyInstance) {
+export default async function insightsRoutes(baseApp: FastifyInstance) {
+  const app = baseApp.withTypeProvider<ZodTypeProvider>();
   // POST /insights/reports — request generation (async, returns 202)
   app.post(
     "/insights/reports",
@@ -66,16 +68,12 @@ export default async function insightsRoutes(app: FastifyInstance) {
           }),
           403: errorSchema,
           422: errorSchema,
+          503: errorSchema,
         },
       },
     },
     async (request, reply) => {
-      const body = request.body as {
-        patient_id: string;
-        report_type: (typeof REPORT_TYPES)[number];
-        period_start: string;
-        period_end: string;
-      };
+      const body = request.body;
 
       // Verify caregiver assignment before any processing
       const patientAccess = await checkPatientAccess(request.jwtUser.sub, body.patient_id);
@@ -177,8 +175,8 @@ export default async function insightsRoutes(app: FastifyInstance) {
           });
         } catch (err) {
           const code =
-            err instanceof Error && (err as { code?: string }).code
-              ? (err as { code: string }).code
+            err instanceof Error && (err as unknown as { code?: string }).code
+              ? (err as unknown as { code: string }).code
               : "AI_SERVICE_ERROR";
           logger.error(
             { err, reportId: report.id, correlationId },
@@ -195,7 +193,7 @@ export default async function insightsRoutes(app: FastifyInstance) {
         report_id: report.id,
         status: "processing",
         estimated_ready_in_seconds: 15,
-        poll_url: `${protocol}://${host}/api/v1/insights/reports/${String(report.id)}`,
+        poll_url: `${protocol}://${host}/api/v1/insights/reports/${report.id}`,
       });
     },
   );
@@ -243,7 +241,7 @@ export default async function insightsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { reportId } = request.params as { reportId: string };
+      const { reportId } = request.params;
 
       const report = await getReportById(reportId);
       if (!report) {
@@ -292,8 +290,18 @@ export default async function insightsRoutes(app: FastifyInstance) {
         is_invalidated: report.isInvalidated,
         content: {
           summary_text: report.summaryText ?? "",
-          pattern_findings: (report.patternFindings as unknown[]) ?? [],
-          confidence_context: (report.confidenceContext as object | null) ?? null,
+          pattern_findings:
+            (report.patternFindings as unknown as {
+              finding_type: string;
+              description: string;
+              supporting_data_points: number;
+              confidence: "low" | "medium" | "high";
+            }[]) ?? [],
+          confidence_context:
+            (report.confidenceContext as unknown as {
+              data_coverage_percent: number;
+              model_limitations: string[];
+            } | null) ?? null,
           disclaimer: CLINICAL_DISCLAIMER_V1,
         },
       });
@@ -349,9 +357,9 @@ export default async function insightsRoutes(app: FastifyInstance) {
       }
 
       const result = await listPatientReports(query.patient_id, {
-        reportType: query.report_type,
+        ...(query.report_type !== undefined && { reportType: query.report_type }),
         limit: query.limit,
-        cursor: query.cursor,
+        ...(query.cursor !== undefined && { cursor: query.cursor }),
       });
 
       return reply.status(200).send({

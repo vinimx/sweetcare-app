@@ -1,4 +1,5 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, preHandlerHookHandler } from "fastify";
+import { type ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { createSymptomRecordSchema } from "@sweetcare/shared-validation";
 import {
@@ -39,12 +40,17 @@ const listQuerySchema = z.object({
   cursor: z.string().optional(),
 });
 
-export default async function symptomRecordsRoutes(app: FastifyInstance) {
+export default async function symptomRecordsRoutes(baseApp: FastifyInstance) {
+  const app = baseApp.withTypeProvider<ZodTypeProvider>();
   // POST /patients/:patientId/symptoms
   app.post(
     "/patients/:patientId/symptoms",
     {
-      preHandler: [app.authenticate, requirePatientAccess, requireWriteAccess],
+      preHandler: [
+        app.authenticate,
+        requirePatientAccess as preHandlerHookHandler,
+        requireWriteAccess as preHandlerHookHandler,
+      ],
       schema: {
         params: z.object({ patientId: z.string().uuid() }),
         body: createSymptomRecordSchema,
@@ -71,7 +77,7 @@ export default async function symptomRecordsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { patientId } = request.params as { patientId: string };
+      const { patientId } = request.params;
       const body = request.body;
 
       const { record, isNew, alertTriggered, alertId } = await createSymptomRecord(
@@ -79,12 +85,12 @@ export default async function symptomRecordsRoutes(app: FastifyInstance) {
           clientId: body.client_id,
           patientProfileId: patientId,
           recordedByUserId: request.jwtUser.sub,
-          symptomCodes: body.symptom_codes as Parameters<
-            typeof createSymptomRecord
-          >[0]["symptomCodes"],
+          symptomCodes: body.symptom_codes,
           severityLevel: body.severity_level,
-          glucoseReadingMgdl: body.glucose_reading_mgdl,
-          notes: body.notes,
+          ...(body.glucose_reading_mgdl !== undefined && {
+            glucoseReadingMgdl: body.glucose_reading_mgdl,
+          }),
+          ...(body.notes !== undefined && { notes: body.notes }),
           observedAt: new Date(body.observed_at),
           timezone: body.timezone,
         },
@@ -112,7 +118,11 @@ export default async function symptomRecordsRoutes(app: FastifyInstance) {
   app.patch(
     "/patients/:patientId/symptoms/:recordId",
     {
-      preHandler: [app.authenticate, requirePatientAccess, requireWriteAccess],
+      preHandler: [
+        app.authenticate,
+        requirePatientAccess as preHandlerHookHandler,
+        requireWriteAccess as preHandlerHookHandler,
+      ],
       schema: {
         params: z.object({ patientId: z.string().uuid(), recordId: z.string().uuid() }),
         body: z.object({
@@ -130,7 +140,7 @@ export default async function symptomRecordsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { patientId, recordId } = request.params as { patientId: string; recordId: string };
+      const { patientId, recordId } = request.params;
       const body = request.body as {
         symptom_codes?: string[];
         severity_level?: "mild" | "moderate" | "severe" | "emergency";
@@ -142,10 +152,12 @@ export default async function symptomRecordsRoutes(app: FastifyInstance) {
         recordId,
         patientId,
         {
-          symptomCodes: body.symptom_codes,
-          severityLevel: body.severity_level,
-          glucoseReadingMgdl: body.glucose_reading_mgdl,
-          notes: body.notes,
+          ...(body.symptom_codes !== undefined && { symptomCodes: body.symptom_codes }),
+          ...(body.severity_level !== undefined && { severityLevel: body.severity_level }),
+          ...(body.glucose_reading_mgdl !== undefined && {
+            glucoseReadingMgdl: body.glucose_reading_mgdl,
+          }),
+          ...(body.notes !== undefined && { notes: body.notes }),
         },
         {
           actorUserId: request.jwtUser.sub,
@@ -163,7 +175,11 @@ export default async function symptomRecordsRoutes(app: FastifyInstance) {
   app.delete(
     "/patients/:patientId/symptoms/:recordId",
     {
-      preHandler: [app.authenticate, requirePatientAccess, requireWriteAccess],
+      preHandler: [
+        app.authenticate,
+        requirePatientAccess as preHandlerHookHandler,
+        requireWriteAccess as preHandlerHookHandler,
+      ],
       schema: {
         params: z.object({ patientId: z.string().uuid(), recordId: z.string().uuid() }),
         response: {
@@ -174,7 +190,7 @@ export default async function symptomRecordsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { patientId, recordId } = request.params as { patientId: string; recordId: string };
+      const { patientId, recordId } = request.params;
 
       await deleteSymptomRecord(recordId, patientId, {
         actorUserId: request.jwtUser.sub,
@@ -191,7 +207,7 @@ export default async function symptomRecordsRoutes(app: FastifyInstance) {
   app.get(
     "/patients/:patientId/symptoms",
     {
-      preHandler: [app.authenticate, requirePatientAccess],
+      preHandler: [app.authenticate, requirePatientAccess as preHandlerHookHandler],
       schema: {
         params: z.object({ patientId: z.string().uuid() }),
         querystring: listQuerySchema,
@@ -206,14 +222,14 @@ export default async function symptomRecordsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { patientId } = request.params as { patientId: string };
-      const query = request.query as z.infer<typeof listQuerySchema>;
+      const { patientId } = request.params;
+      const query = request.query;
 
       const result = await listSymptomRecords(patientId, {
-        from: query.from ? new Date(query.from) : undefined,
-        to: query.to ? new Date(query.to) : undefined,
+        ...(query.from ? { from: new Date(query.from) } : {}),
+        ...(query.to ? { to: new Date(query.to) } : {}),
         limit: query.limit,
-        cursor: query.cursor,
+        ...(query.cursor ? { cursor: query.cursor } : {}),
       });
 
       return reply.status(200).send({
@@ -221,9 +237,9 @@ export default async function symptomRecordsRoutes(app: FastifyInstance) {
           record_id: r.id,
           client_id: r.clientId,
           patient_profile_id: r.patientProfileId,
-          symptom_codes: r.symptomCodes as string[],
+          symptom_codes: r.symptomCodes,
           severity_level: r.severityLevel,
-          glucose_reading_mgdl: r.glucoseReadingMgdl,
+          glucose_reading_mgdl: r.glucoseReadingMgdl != null ? Number(r.glucoseReadingMgdl) : null,
           notes: r.notes,
           observed_at: r.observedAt.toISOString(),
           recorded_at: r.recordedAt.toISOString(),

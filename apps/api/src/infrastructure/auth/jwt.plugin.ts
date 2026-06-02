@@ -47,7 +47,7 @@ function getSecret(key: string, minLength: number): string {
 export default fp(async function jwtPlugin(app: FastifyInstance) {
   await app.register(fastifyCookie, { secret: getSecret("JWT_ACCESS_SECRET", 32) });
 
-  await app.register(fastifyJwt, {
+  await app.register(fastifyJwt as unknown as Parameters<typeof app.register>[0], {
     secret: getSecret("JWT_ACCESS_SECRET", 32),
     sign: {
       algorithm: "HS256",

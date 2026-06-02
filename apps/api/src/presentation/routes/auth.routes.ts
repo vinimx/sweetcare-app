@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { type ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { registerSchema, loginSchema, mfaVerifySchema } from "@sweetcare/shared-validation";
 import { register, login, refresh, logout } from "../../application/auth/auth.service.js";
@@ -63,7 +64,8 @@ async function fetchUserById(userId: string) {
   };
 }
 
-export default async function authRoutes(app: FastifyInstance) {
+export default async function authRoutes(baseApp: FastifyInstance) {
+  const app = baseApp.withTypeProvider<ZodTypeProvider>();
   // GET /users/me — returns authenticated user profile
   app.get(
     "/users/me",
@@ -113,7 +115,7 @@ export default async function authRoutes(app: FastifyInstance) {
         expiresIn: 900,
         refreshToken: result.refreshToken,
         userId: result.userId,
-        role: result.role as string,
+        role: result.role,
         user,
       });
     },
@@ -146,7 +148,7 @@ export default async function authRoutes(app: FastifyInstance) {
         expiresIn: 900,
         refreshToken: result.refreshToken,
         userId: result.userId,
-        role: result.role as string,
+        role: result.role,
         user,
       });
     },

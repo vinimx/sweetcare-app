@@ -1,9 +1,11 @@
 import type { FastifyInstance } from "fastify";
+import { type ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { consentGrantSchema } from "@sweetcare/shared-validation";
 import { grantConsent, revokeConsent } from "../../application/auth/auth.service.js";
 
-export default async function consentRoutes(app: FastifyInstance) {
+export default async function consentRoutes(baseApp: FastifyInstance) {
+  const app = baseApp.withTypeProvider<ZodTypeProvider>();
   // POST /consent — LGPD Art. 14 guardian consent grant
   app.post(
     "/consent",
@@ -56,7 +58,7 @@ export default async function consentRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { consentId } = request.params as { consentId: string };
+      const { consentId } = request.params;
       const ipAddress = request.ip ?? "unknown";
       const userAgent = request.headers["user-agent"] ?? "unknown";
 
