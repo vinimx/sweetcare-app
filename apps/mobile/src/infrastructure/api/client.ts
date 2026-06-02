@@ -1,6 +1,9 @@
 import { tokenStorage } from "../storage/secure-storage.js";
 
-const API_BASE = process.env["EXPO_PUBLIC_API_URL"] ?? "http://localhost:3000/api/v1";
+const API_BASE =
+  typeof process.env["EXPO_PUBLIC_API_URL"] === "string"
+    ? process.env["EXPO_PUBLIC_API_URL"]
+    : "http://localhost:3000/api/v1";
 
 export class ApiError extends Error {
   constructor(
