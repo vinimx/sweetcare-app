@@ -291,14 +291,14 @@ export default async function insightsRoutes(baseApp: FastifyInstance) {
         content: {
           summary_text: report.summaryText ?? "",
           pattern_findings:
-            (report.patternFindings as unknown as {
+            (report.patternFindings as {
               finding_type: string;
               description: string;
               supporting_data_points: number;
               confidence: "low" | "medium" | "high";
             }[]) ?? [],
           confidence_context:
-            (report.confidenceContext as unknown as {
+            (report.confidenceContext as {
               data_coverage_percent: number;
               model_limitations: string[];
             } | null) ?? null,

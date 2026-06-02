@@ -126,7 +126,7 @@ export function getPrismaClient(): PrismaClient {
 
     _client = createEncryptingPrisma(_base);
   }
-  return _client as PrismaClient;
+  return _client;
 }
 
 export async function disconnectPrisma(): Promise<void> {
