@@ -5,8 +5,8 @@ All requests must originate from the Fastify API proxy.
 PHI never enters this service — only aggregated clinical metrics.
 """
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 import structlog
 from fastapi import FastAPI, Request, Response
@@ -79,6 +79,6 @@ async def ready() -> dict[str, str]:
 
 
 # Phase 5 (US3)
-from app.api.analyze import router as analyze_router
+from app.api.analyze import router as analyze_router  # noqa: E402
 
 app.include_router(analyze_router, prefix="/v1")

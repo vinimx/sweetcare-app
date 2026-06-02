@@ -1,6 +1,6 @@
 """Computes confidence ratings for pattern findings and overall report confidence context."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Literal
 
 from app.schemas.analyze import AggregatedRecord, ConfidenceContext
@@ -47,7 +47,8 @@ def compute_confidence_context(
         )
     if coverage_percent < 70:
         limitations.append(
-            f"Data available for only {coverage_percent:.0f}% of the period — gaps may affect accuracy"
+            f"Data available for only {coverage_percent:.0f}% of the period — gaps may affect "
+            "accuracy"
         )
     if len(glucose_records) < 5:
         limitations.append(

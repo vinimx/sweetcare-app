@@ -8,7 +8,6 @@ Verifies input/output schema compliance and core business rules:
 - model_version always present
 """
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -51,10 +50,10 @@ def _make_request(records: list[dict], report_type: str = "weekly_summary") -> d
 # ── Schema compliance ────────────────────────────────────────────────────────
 
 
-def test_successful_response_schema():
+def test_successful_response_schema() -> None:
     records = [dict(BASE_INSULIN, occurred_at=f"2026-05-0{i+1}T08:00:00+00:00") for i in range(5)]
     resp = client.post("/v1/analyze", json=_make_request(records))
-    assert resp.status_code == 200
+    assert resp.status_code == 200  # noqa: S101
 
     body = resp.json()
     assert "request_id" in body
@@ -66,41 +65,41 @@ def test_successful_response_schema():
     assert isinstance(body["processing_time_ms"], int)
 
 
-def test_request_id_echoed():
+def test_request_id_echoed() -> None:
     records = [dict(BASE_INSULIN, occurred_at=f"2026-05-0{i+1}T08:00:00+00:00") for i in range(3)]
     resp = client.post("/v1/analyze", json=_make_request(records))
-    assert resp.json()["request_id"] == "test-req-001"
+    assert resp.json()["request_id"] == "test-req-001"  # noqa: S101
 
 
-def test_model_version_always_present():
+def test_model_version_always_present() -> None:
     records = [dict(BASE_INSULIN, occurred_at=f"2026-05-0{i+1}T08:00:00+00:00") for i in range(3)]
     resp = client.post("/v1/analyze", json=_make_request(records))
     body = resp.json()
-    assert body["model_version"] != ""
+    assert body["model_version"] != ""  # noqa: S101
 
 
-def test_all_report_types_accepted():
+def test_all_report_types_accepted() -> None:
     records = [dict(BASE_INSULIN, occurred_at=f"2026-05-0{i+1}T08:00:00+00:00") for i in range(3)]
     for rtype in ("weekly_summary", "glucose_pattern", "insulin_effectiveness", "symptom_trend"):
         resp = client.post("/v1/analyze", json=_make_request(records, report_type=rtype))
-        assert resp.status_code == 200, f"Failed for report_type={rtype}"
+        assert resp.status_code == 200, f"Failed for report_type={rtype}"  # noqa: S101
 
 
-def test_invalid_report_type_rejected():
+def test_invalid_report_type_rejected() -> None:
     records = [dict(BASE_INSULIN) for _ in range(3)]
     resp = client.post("/v1/analyze", json=_make_request(records, report_type="invalid_type"))
-    assert resp.status_code == 422
+    assert resp.status_code == 422  # noqa: S101
 
 
-def test_missing_required_fields_rejected():
+def test_missing_required_fields_rejected() -> None:
     resp = client.post("/v1/analyze", json={"report_type": "weekly_summary"})
-    assert resp.status_code == 422
+    assert resp.status_code == 422  # noqa: S101
 
 
 # ── Findings business rules ──────────────────────────────────────────────────
 
 
-def test_findings_suppressed_below_min_support():
+def test_findings_suppressed_below_min_support() -> None:
     """Findings with fewer than 3 supporting data points must be suppressed."""
     # Only 1 high glucose + meal record — below threshold
     records = [
@@ -111,83 +110,107 @@ def test_findings_suppressed_below_min_support():
     ]
     resp = client.post("/v1/analyze", json=_make_request(records))
     body = resp.json()
-    spike_findings = [f for f in body["pattern_findings"] if f["finding_type"] == "post_meal_glucose_spike"]
-    assert len(spike_findings) == 0
+    spike_findings = [  # noqa: S101
+        f for f in body["pattern_findings"] if f["finding_type"] == "post_meal_glucose_spike"
+    ]
+    assert len(spike_findings) == 0  # noqa: S101
 
 
-def test_findings_confidence_field_always_present():
+def test_findings_confidence_field_always_present() -> None:
     records = (
         [dict(BASE_INSULIN, occurred_at=f"2026-05-0{i+1}T08:00:00+00:00") for i in range(7)]
-        + [dict(BASE_GLUCOSE, value=250.0, occurred_at=f"2026-05-0{i+1}T09:30:00+00:00") for i in range(5)]
+        + [
+            dict(BASE_GLUCOSE, value=250.0, occurred_at=f"2026-05-0{i+1}T09:30:00+00:00")
+            for i in range(5)
+        ]
     )
     resp = client.post("/v1/analyze", json=_make_request(records))
     for finding in resp.json()["pattern_findings"]:
-        assert finding["confidence"] in ("low", "medium", "high")
-        assert isinstance(finding["supporting_data_points"], int)
-        assert finding["supporting_data_points"] >= 3
+        assert finding["confidence"] in ("low", "medium", "high")  # noqa: S101
+        assert isinstance(finding["supporting_data_points"], int)  # noqa: S101
+        assert finding["supporting_data_points"] >= 3  # noqa: S101
 
 
-def test_finding_confidence_increases_with_more_data():
-    few_records = (
-        [dict(BASE_INSULIN, **{"metadata": {"dose_rationale": "correction", "timezone": "UTC"}, "occurred_at": f"2026-05-0{i+1}T08:00:00+00:00"}) for i in range(3)]
-    )
-    many_records = (
-        [dict(BASE_INSULIN, **{"metadata": {"dose_rationale": "correction", "timezone": "UTC"}, "occurred_at": f"2026-05-{i+1:02d}T08:00:00+00:00"}) for i in range(12)]
-    )
+def test_finding_confidence_increases_with_more_data() -> None:
+    few_records = [
+        dict(
+            BASE_INSULIN,
+            **{
+                "metadata": {"dose_rationale": "correction", "timezone": "UTC"},
+                "occurred_at": f"2026-05-0{i+1}T08:00:00+00:00",
+            },
+        )
+        for i in range(3)
+    ]
+    many_records = [
+        dict(
+            BASE_INSULIN,
+            **{
+                "metadata": {"dose_rationale": "correction", "timezone": "UTC"},
+                "occurred_at": f"2026-05-{i+1:02d}T08:00:00+00:00",
+            },
+        )
+        for i in range(12)
+    ]
 
     resp_few = client.post("/v1/analyze", json=_make_request(few_records))
-    resp_many = client.post("/v1/analyze", json=_make_request(many_records, ))
+    resp_many = client.post("/v1/analyze", json=_make_request(many_records))
 
     findings_few = {f["finding_type"]: f for f in resp_few.json()["pattern_findings"]}
     findings_many = {f["finding_type"]: f for f in resp_many.json()["pattern_findings"]}
 
     if "high_correction_frequency" in findings_few and "high_correction_frequency" in findings_many:
         conf_order = {"low": 0, "medium": 1, "high": 2}
-        assert conf_order[findings_many["high_correction_frequency"]["confidence"]] >= conf_order[findings_few["high_correction_frequency"]["confidence"]]
+        assert (
+            conf_order[findings_many["high_correction_frequency"]["confidence"]]
+            >= conf_order[findings_few["high_correction_frequency"]["confidence"]]
+        )  # noqa: S101
 
 
 # ── PHI isolation ────────────────────────────────────────────────────────────
 
 
-def test_response_contains_no_patient_name():
+def test_response_contains_no_patient_name() -> None:
     """Output must never echo back patient identifiers."""
     records = [dict(BASE_INSULIN, occurred_at=f"2026-05-0{i+1}T08:00:00+00:00") for i in range(3)]
     payload = _make_request(records)
     payload["patient_profile_id"] = "patient-should-not-appear-in-output"
     resp = client.post("/v1/analyze", json=payload)
     body_text = resp.text
-    assert "patient-should-not-appear-in-output" not in body_text
+    assert "patient-should-not-appear-in-output" not in body_text  # noqa: S101
 
 
 # ── Confidence context ───────────────────────────────────────────────────────
 
 
-def test_confidence_context_present_in_response():
+def test_confidence_context_present_in_response() -> None:
     records = [dict(BASE_INSULIN, occurred_at=f"2026-05-0{i+1}T08:00:00+00:00") for i in range(5)]
     resp = client.post("/v1/analyze", json=_make_request(records))
     ctx = resp.json()["confidence_context"]
-    assert ctx is not None
-    assert "data_coverage_percent" in ctx
-    assert "model_limitations" in ctx
-    assert isinstance(ctx["model_limitations"], list)
+    assert ctx is not None  # noqa: S101
+    assert "data_coverage_percent" in ctx  # noqa: S101
+    assert "model_limitations" in ctx  # noqa: S101
+    assert isinstance(ctx["model_limitations"], list)  # noqa: S101
 
 
-def test_short_period_adds_limitation_warning():
+def test_short_period_adds_limitation_warning() -> None:
     records = [dict(BASE_INSULIN, occurred_at=f"2026-05-0{i+1}T08:00:00+00:00") for i in range(3)]
     payload = _make_request(records)
     payload["period_start"] = "2026-05-01"
     payload["period_end"] = "2026-05-03"  # only 2 days
     resp = client.post("/v1/analyze", json=payload)
     ctx = resp.json()["confidence_context"]
-    assert any("7 days" in lim or "days" in lim for lim in ctx["model_limitations"])
+    assert any(  # noqa: S101
+        "7 days" in lim or "days" in lim for lim in ctx["model_limitations"]
+    )
 
 
 # ── Internal-only enforcement ────────────────────────────────────────────────
 
 
-def test_request_without_internal_header_rejected():
+def test_request_without_internal_header_rejected() -> None:
     """Requests without X-Internal-Request-Id must be rejected."""
     plain_client = TestClient(app)
     records = [dict(BASE_INSULIN, occurred_at=f"2026-05-0{i+1}T08:00:00+00:00") for i in range(3)]
     resp = plain_client.post("/v1/analyze", json=_make_request(records))
-    assert resp.status_code == 403
+    assert resp.status_code == 403  # noqa: S101
