@@ -12,6 +12,7 @@ import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from starlette.middleware.base import RequestResponseEndpoint
 
 log = structlog.get_logger(__name__)
 
@@ -55,7 +56,10 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def enforce_internal_only(request: Request, call_next: object) -> Response:
+async def enforce_internal_only(
+    request: Request,
+    call_next: RequestResponseEndpoint,
+) -> Response:
     """Block requests that don't carry the internal request ID header."""
     if request.url.path not in ("/health", "/ready"):
         internal_id = request.headers.get("X-Internal-Request-Id")
@@ -65,7 +69,7 @@ async def enforce_internal_only(request: Request, call_next: object) -> Response
                 status_code=403,
                 media_type="application/json",
             )
-    return await call_next(request)  # type: ignore[operator]
+    return await call_next(request)
 
 
 @app.get("/health", tags=["ops"])
