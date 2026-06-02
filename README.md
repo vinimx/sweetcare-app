@@ -58,16 +58,16 @@ O projeto foi construído como um **monorepo full-stack** com três aplicações
 
 ## Funcionalidades
 
-| Funcionalidade | Descrição |
+| Funcionalidade            | Descrição                                                                                                                                                      |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Registro de insulina** | CRUD completo com fila offline — dados salvos em SQLite criptografado quando sem conexão, sincronizados automaticamente ao reconectar |
-| **Registro de sintomas** | Picker de sintomas com severidade calculada automaticamente; sintomas críticos disparam alerta de emergência na mesma transação |
-| **Alertas de emergência** | Motor de regras avalia 5 critérios clínicos a cada registro de sintoma; guidance estruturado passo a passo + contatos de emergência (SAMU/Bombeiros) |
-| **Insights com IA** | Análise estatística de padrões em 30 dias via microserviço FastAPI isolado; relatórios interativos com gráficos de confiança e exportação para consulta médica |
-| **Offline-first** | SQLite + React Query; API de sincronização em batch com detecção de conflitos e idempotência via `client_id` UUIDv4 |
-| **Multi-paciente** | Uma conta gerencia múltiplos perfis de paciente; RBAC com papéis guardian / caregiver / read-only |
-| **Conformidade LGPD** | Exportação de dados (`GET /users/me/data-export`) e direito ao esquecimento (`DELETE /users/me`); rastreamento de consentimento por finalidade |
-| **Observabilidade** | Endpoint Prometheus `/metrics` + dashboard Grafana; logs Pino estruturados com redação de PHI; Correlation ID em toda resposta |
+| **Registro de insulina**  | CRUD completo com fila offline — dados salvos em SQLite criptografado quando sem conexão, sincronizados automaticamente ao reconectar                          |
+| **Registro de sintomas**  | Picker de sintomas com severidade calculada automaticamente; sintomas críticos disparam alerta de emergência na mesma transação                                |
+| **Alertas de emergência** | Motor de regras avalia 5 critérios clínicos a cada registro de sintoma; guidance estruturado passo a passo + contatos de emergência (SAMU/Bombeiros)           |
+| **Insights com IA**       | Análise estatística de padrões em 30 dias via microserviço FastAPI isolado; relatórios interativos com gráficos de confiança e exportação para consulta médica |
+| **Offline-first**         | SQLite + React Query; API de sincronização em batch com detecção de conflitos e idempotência via `client_id` UUIDv4                                            |
+| **Multi-paciente**        | Uma conta gerencia múltiplos perfis de paciente; RBAC com papéis guardian / caregiver / read-only                                                              |
+| **Conformidade LGPD**     | Exportação de dados (`GET /users/me/data-export`) e direito ao esquecimento (`DELETE /users/me`); rastreamento de consentimento por finalidade                 |
+| **Observabilidade**       | Endpoint Prometheus `/metrics` + dashboard Grafana; logs Pino estruturados com redação de PHI; Correlation ID em toda resposta                                 |
 
 ---
 
@@ -75,50 +75,50 @@ O projeto foi construído como um **monorepo full-stack** com três aplicações
 
 ```
 
- Mobile (Expo SDK 54 / React Native 0.81) 
- • Expo Router 6 — navegação file-based (New Architecture) 
- • React Query 5 — server state + fila de mutações offline 
- • SQLite (expo-sqlite 16) — PHI criptografado no dispositivo 
- • expo-secure-store — tokens (iOS Keychain / Android Keystore) 
+ Mobile (Expo SDK 54 / React Native 0.81)
+ • Expo Router 6 — navegação file-based (New Architecture)
+ • React Query 5 — server state + fila de mutações offline
+ • SQLite (expo-sqlite 16) — PHI criptografado no dispositivo
+ • expo-secure-store — tokens (iOS Keychain / Android Keystore)
 
  HTTPS / TLS 1.3
- 
 
- API (Fastify 5 / TypeScript / Node.js 20 LTS) 
- • Zod type provider — validação schema-first 
- • JWT HS256 15 min (access) + opaque refresh 7 dias 
- • Prisma 6 + extensão AES-256-GCM por campo PHI 
- • Pino — logging estruturado, 15 caminhos PHI redatados 
+
+ API (Fastify 5 / TypeScript / Node.js 20 LTS)
+ • Zod type provider — validação schema-first
+ • JWT HS256 15 min (access) + opaque refresh 7 dias
+ • Prisma 6 + extensão AES-256-GCM por campo PHI
+ • Pino — logging estruturado, 15 caminhos PHI redatados
 
  PostgreSQL HTTP (rede Docker interna)
- 
- 
- PostgreSQL AI Service (FastAPI / Python 3.12) 
- • pgcrypto • Rede Docker interna isolada 
- • Row Level • Recebe apenas métricas agregadas 
- Security • PHI NUNCA entra neste serviço 
- • Triggers de • 5 detectores estatísticos 
- imutabilidade (scikit-learn + numpy + pandas) 
- • pgaudit 
 
- 
 
- Redis 7 
+ PostgreSQL AI Service (FastAPI / Python 3.12)
+ • pgcrypto • Rede Docker interna isolada
+ • Row Level • Recebe apenas métricas agregadas
+ Security • PHI NUNCA entra neste serviço
+ • Triggers de • 5 detectores estatísticos
+ imutabilidade (scikit-learn + numpy + pandas)
+ • pgaudit
+
+
+
+ Redis 7
  • Cache de sessão
- • Rate limiting 
+ • Rate limiting
 
 ```
 
 ### Princípios arquiteturais
 
-| Princípio | Implementação |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Safety-critical first** | Registros médicos imutáveis por triggers no banco; alertas de emergência criados síncronos na mesma transação do sintoma |
-| **Defense-in-depth** | TLS → RBAC → RLS → AES-256-GCM por campo → audit trail append-only |
-| **PHI zero-trust em logs** | Redação Pino — apenas UUIDs de correlação, zero dado clínico nos logs |
-| **Offline-first** | Fila SQLite + React Query; sync batch com detecção de conflitos e upserts idempotentes |
-| **IA isolada** | FastAPI recebe apenas métricas sem PHI; proxy Fastify remove todos os dados pessoais antes de encaminhar |
-| **Imutabilidade** | Triggers `BEFORE UPDATE OR DELETE` em todas as tabelas médicas; `AuditEntry` somente append |
+| Princípio                  | Implementação                                                                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Safety-critical first**  | Registros médicos imutáveis por triggers no banco; alertas de emergência criados síncronos na mesma transação do sintoma |
+| **Defense-in-depth**       | TLS → RBAC → RLS → AES-256-GCM por campo → audit trail append-only                                                       |
+| **PHI zero-trust em logs** | Redação Pino — apenas UUIDs de correlação, zero dado clínico nos logs                                                    |
+| **Offline-first**          | Fila SQLite + React Query; sync batch com detecção de conflitos e upserts idempotentes                                   |
+| **IA isolada**             | FastAPI recebe apenas métricas sem PHI; proxy Fastify remove todos os dados pessoais antes de encaminhar                 |
+| **Imutabilidade**          | Triggers `BEFORE UPDATE OR DELETE` em todas as tabelas médicas; `AuditEntry` somente append                              |
 
 ---
 
@@ -140,7 +140,7 @@ sweetcare-app/
  application/ # Services, auditoria, auth
  infrastructure/# DB, JWT, sessões, cliente AI, logging
  presentation/ # Rotas HTTP
- 
+
  mobile/ # Expo SDK 54 / React Native 0.81
  app/ # Páginas Expo Router (file-based)
  (tabs)/ # Início · Registrar · Insights · Perfil
@@ -152,7 +152,7 @@ sweetcare-app/
  design/ # Design system (tokens, componentes, tema)
  features/ # Telas por funcionalidade
  infrastructure/# API client, AuthContext, DB offline, sync engine
- 
+
  ai-service/ # FastAPI — microserviço de análise estatística
  app/
  api/ # POST /v1/analyze
@@ -188,13 +188,13 @@ sweetcare-app/
 
 ### Conformidade LGPD Art. 14 (dados de menores)
 
-| Requisito | Implementação |
-| ------------------------------- | ----------------------------------------------------------------------------- |
-| Consentimento do responsável | `ConsentRecord` criado atomicamente com o `PatientProfile` |
-| Revogação | `DELETE /consent/:id` — congela processamento imediatamente |
-| Minimização de dados | Apenas campos clinicamente necessários são coletados |
-| Direito de acesso | `GET /users/me/data-export` — exportação completa em JSON |
-| Direito ao esquecimento | `DELETE /users/me` — anonimização + exclusão em cascata dos registros médicos |
+| Requisito                    | Implementação                                                                 |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| Consentimento do responsável | `ConsentRecord` criado atomicamente com o `PatientProfile`                    |
+| Revogação                    | `DELETE /consent/:id` — congela processamento imediatamente                   |
+| Minimização de dados         | Apenas campos clinicamente necessários são coletados                          |
+| Direito de acesso            | `GET /users/me/data-export` — exportação completa em JSON                     |
+| Direito ao esquecimento      | `DELETE /users/me` — anonimização + exclusão em cascata dos registros médicos |
 
 ### Isolamento do serviço de IA
 
@@ -320,24 +320,24 @@ pnpm --filter "@sweetcare/mobile" start
 
 ### `apps/api/.env`
 
-| Variável | Obrigatório | Padrão | Descrição |
+| Variável             | Obrigatório | Padrão                  | Descrição                                            |
 | -------------------- | :---------: | ----------------------- | ---------------------------------------------------- |
-| `DATABASE_URL` | Sim | — | Connection string PostgreSQL (porta 5433 com Docker) |
-| `JWT_ACCESS_SECRET` | Sim | — | Mín. 32 chars — chave de assinatura JWT |
-| `JWT_REFRESH_SECRET` | Sim | — | Mín. 32 chars — diferente do access secret |
-| `PHI_ENCRYPTION_KEY` | Sim | — | 64 hex chars (32 bytes) para AES-256-GCM |
-| `REDIS_URL` | Sim | — | Connection string Redis |
-| `NODE_ENV` | Sim | — | `development` \| `test` \| `production` |
-| `PORT` | — | `3000` | Porta HTTP |
-| `AI_SERVICE_URL` | — | `http://localhost:8000` | URL interna do AI service |
-| `LOG_LEVEL` | — | `info` | `trace` \| `debug` \| `info` \| `warn` \| `error` |
+| `DATABASE_URL`       |     Sim     | —                       | Connection string PostgreSQL (porta 5433 com Docker) |
+| `JWT_ACCESS_SECRET`  |     Sim     | —                       | Mín. 32 chars — chave de assinatura JWT              |
+| `JWT_REFRESH_SECRET` |     Sim     | —                       | Mín. 32 chars — diferente do access secret           |
+| `PHI_ENCRYPTION_KEY` |     Sim     | —                       | 64 hex chars (32 bytes) para AES-256-GCM             |
+| `REDIS_URL`          |     Sim     | —                       | Connection string Redis                              |
+| `NODE_ENV`           |     Sim     | —                       | `development` \| `test` \| `production`              |
+| `PORT`               |      —      | `3000`                  | Porta HTTP                                           |
+| `AI_SERVICE_URL`     |      —      | `http://localhost:8000` | URL interna do AI service                            |
+| `LOG_LEVEL`          |      —      | `info`                  | `trace` \| `debug` \| `info` \| `warn` \| `error`    |
 
 ### `apps/mobile/.env.local`
 
-| Variável | Descrição |
+| Variável              | Descrição                                                  |
 | --------------------- | ---------------------------------------------------------- |
 | `EXPO_PUBLIC_API_URL` | URL completa da API (ex: `http://192.168.1.5:3000/api/v1`) |
-| `EXPO_PUBLIC_ENV` | `development` \| `staging` \| `production` |
+| `EXPO_PUBLIC_ENV`     | `development` \| `staging` \| `production`                 |
 
 ---
 
@@ -363,12 +363,12 @@ pnpm typecheck
 
 ### Cobertura atual
 
-| Camada | Framework | Casos | Status |
+| Camada                | Framework     | Casos |  Status   |
 | --------------------- | ------------- | :---: | :-------: |
-| API — integração | Vitest | 49 | Concluído |
-| AI Service — contrato | pytest | 13 | Concluído |
-| Mobile — componentes | Vitest + RNTL | — | Planejado |
-| E2E mobile | Detox | — | Planejado |
+| API — integração      | Vitest        |  49   | Concluído |
+| AI Service — contrato | pytest        |  13   | Concluído |
+| Mobile — componentes  | Vitest + RNTL |   —   | Planejado |
+| E2E mobile            | Detox         |   —   | Planejado |
 
 ---
 
@@ -380,10 +380,10 @@ A stack de monitoramento é **opcional** e roda separadamente:
 docker compose -f infra/docker/compose.monitoring.yml up -d
 ```
 
-| Serviço | URL | Acesso |
+| Serviço    | URL                   | Acesso           |
 | ---------- | --------------------- | ---------------- |
-| Grafana | http://localhost:3001 | admin / changeme |
-| Prometheus | http://localhost:9090 | — |
+| Grafana    | http://localhost:3001 | admin / changeme |
+| Prometheus | http://localhost:9090 | —                |
 
 A API expõe métricas no formato Prometheus em `GET /api/v1/metrics` — sem dependências externas, usando `process.memoryUsage()` + `process.uptime()`. O dashboard Grafana inclui 5 painéis: uptime, heap usado, RSS, série temporal de heap e memória do processo.
 
@@ -396,69 +396,69 @@ Todos os endpoints têm prefixo `/api/v1`. Toda resposta inclui `X-Correlation-I
 <details>
 <summary><strong>Autenticação e Sessão</strong></summary>
 
-| Método | Endpoint | Auth | Descrição |
+| Método   | Endpoint         |      Auth      | Descrição                                  |
 | -------- | ---------------- | :------------: | ------------------------------------------ |
-| `POST` | `/auth/register` | — | Cadastro + auto-login (retorna tokens) |
-| `POST` | `/auth/login` | — | Login (access token + cookie de refresh) |
-| `POST` | `/auth/refresh` | Cookie ou body | Rotacionar refresh token |
-| `POST` | `/auth/logout` | Bearer | Invalidar família de sessão |
-| `GET` | `/users/me` | Bearer | Dados do usuário autenticado |
-| `PATCH` | `/users/me` | Bearer | Atualizar perfil |
-| `POST` | `/consent` | Bearer | Conceder consentimento (ex: `ai_analysis`) |
-| `DELETE` | `/consent/:id` | Bearer | Revogar consentimento |
+| `POST`   | `/auth/register` |       —        | Cadastro + auto-login (retorna tokens)     |
+| `POST`   | `/auth/login`    |       —        | Login (access token + cookie de refresh)   |
+| `POST`   | `/auth/refresh`  | Cookie ou body | Rotacionar refresh token                   |
+| `POST`   | `/auth/logout`   |     Bearer     | Invalidar família de sessão                |
+| `GET`    | `/users/me`      |     Bearer     | Dados do usuário autenticado               |
+| `PATCH`  | `/users/me`      |     Bearer     | Atualizar perfil                           |
+| `POST`   | `/consent`       |     Bearer     | Conceder consentimento (ex: `ai_analysis`) |
+| `DELETE` | `/consent/:id`   |     Bearer     | Revogar consentimento                      |
 
 </details>
 
 <details>
 <summary><strong>Pacientes e Registros Médicos</strong></summary>
 
-| Método | Endpoint | Descrição |
+| Método   | Endpoint                             | Descrição                                    |
 | -------- | ------------------------------------ | -------------------------------------------- |
-| `POST` | `/patients` | Criar perfil de paciente |
-| `GET` | `/patients/:id` | Consultar perfil |
-| `PATCH` | `/patients/:id` | Atualizar perfil |
-| `POST` | `/patients/:id/insulin-records` | Registrar aplicação de insulina |
-| `GET` | `/patients/:id/insulin-records` | Listar registros de insulina |
-| `PATCH` | `/patients/:id/insulin-records/:rid` | Atualizar registro |
-| `DELETE` | `/patients/:id/insulin-records/:rid` | Excluir registro |
-| `POST` | `/patients/:id/symptoms` | Registrar sintoma (dispara motor de alertas) |
-| `GET` | `/patients/:id/symptoms` | Listar registros de sintoma |
-| `PATCH` | `/patients/:id/symptoms/:rid` | Atualizar registro |
-| `DELETE` | `/patients/:id/symptoms/:rid` | Excluir registro |
-| `GET` | `/patients/:id/timeline` | Timeline mesclada (insulina + sintomas) |
+| `POST`   | `/patients`                          | Criar perfil de paciente                     |
+| `GET`    | `/patients/:id`                      | Consultar perfil                             |
+| `PATCH`  | `/patients/:id`                      | Atualizar perfil                             |
+| `POST`   | `/patients/:id/insulin-records`      | Registrar aplicação de insulina              |
+| `GET`    | `/patients/:id/insulin-records`      | Listar registros de insulina                 |
+| `PATCH`  | `/patients/:id/insulin-records/:rid` | Atualizar registro                           |
+| `DELETE` | `/patients/:id/insulin-records/:rid` | Excluir registro                             |
+| `POST`   | `/patients/:id/symptoms`             | Registrar sintoma (dispara motor de alertas) |
+| `GET`    | `/patients/:id/symptoms`             | Listar registros de sintoma                  |
+| `PATCH`  | `/patients/:id/symptoms/:rid`        | Atualizar registro                           |
+| `DELETE` | `/patients/:id/symptoms/:rid`        | Excluir registro                             |
+| `GET`    | `/patients/:id/timeline`             | Timeline mesclada (insulina + sintomas)      |
 
 </details>
 
 <details>
 <summary><strong>Alertas de Emergência</strong></summary>
 
-| Método | Endpoint | Descrição |
+| Método  | Endpoint               | Descrição                                    |
 | ------- | ---------------------- | -------------------------------------------- |
-| `GET` | `/patients/:id/alerts` | Listar alertas do paciente |
-| `GET` | `/alerts/:id` | Detalhe do alerta com guidance passo a passo |
-| `PATCH` | `/alerts/:id/resolve` | Marcar alerta como resolvido |
+| `GET`   | `/patients/:id/alerts` | Listar alertas do paciente                   |
+| `GET`   | `/alerts/:id`          | Detalhe do alerta com guidance passo a passo |
+| `PATCH` | `/alerts/:id/resolve`  | Marcar alerta como resolvido                 |
 
 </details>
 
 <details>
 <summary><strong>Sincronização Offline</strong></summary>
 
-| Método | Endpoint | Descrição |
+| Método | Endpoint                  | Descrição                                        |
 | ------ | ------------------------- | ------------------------------------------------ |
-| `POST` | `/sync/batch` | Enviar lote de fila offline (máx. 100 registros) |
-| `GET` | `/sync/status/:patientId` | Verificar status da sincronização |
-| `POST` | `/sync/resolve-conflict` | Resolver conflito de sincronização |
+| `POST` | `/sync/batch`             | Enviar lote de fila offline (máx. 100 registros) |
+| `GET`  | `/sync/status/:patientId` | Verificar status da sincronização                |
+| `POST` | `/sync/resolve-conflict`  | Resolver conflito de sincronização               |
 
 </details>
 
 <details>
 <summary><strong>Insights com IA</strong></summary>
 
-| Método | Endpoint | Descrição |
+| Método | Endpoint                | Descrição                                   |
 | ------ | ----------------------- | ------------------------------------------- |
-| `POST` | `/insights/reports` | Solicitar análise (assíncrono, retorna 202) |
-| `GET` | `/insights/reports/:id` | Consultar status ou relatório concluído |
-| `GET` | `/insights/reports` | Listar relatórios do paciente |
+| `POST` | `/insights/reports`     | Solicitar análise (assíncrono, retorna 202) |
+| `GET`  | `/insights/reports/:id` | Consultar status ou relatório concluído     |
+| `GET`  | `/insights/reports`     | Listar relatórios do paciente               |
 
 > O fluxo é: `POST` → 202 (processing) → polling a cada 5s → `completed` ou `failed`.
 > Exige consentimento `ai_analysis` ativo.
@@ -468,21 +468,21 @@ Todos os endpoints têm prefixo `/api/v1`. Toda resposta inclui `X-Correlation-I
 <details>
 <summary><strong>Direitos LGPD</strong></summary>
 
-| Método | Endpoint | Descrição |
+| Método   | Endpoint                | Descrição                                    |
 | -------- | ----------------------- | -------------------------------------------- |
-| `GET` | `/users/me/data-export` | Exportar todos os dados pessoais (Art. 18) |
-| `DELETE` | `/users/me` | Excluir conta (requer confirmação por senha) |
+| `GET`    | `/users/me/data-export` | Exportar todos os dados pessoais (Art. 18)   |
+| `DELETE` | `/users/me`             | Excluir conta (requer confirmação por senha) |
 
 </details>
 
 <details>
 <summary><strong>Operações</strong></summary>
 
-| Método | Endpoint | Descrição |
+| Método | Endpoint   | Descrição           |
 | ------ | ---------- | ------------------- |
-| `GET` | `/health` | Liveness check |
-| `GET` | `/ready` | Readiness check |
-| `GET` | `/metrics` | Métricas Prometheus |
+| `GET`  | `/health`  | Liveness check      |
+| `GET`  | `/ready`   | Readiness check     |
+| `GET`  | `/metrics` | Métricas Prometheus |
 
 </details>
 
@@ -536,4 +536,3 @@ User < UserSession (famílias de tokens com detecção de roubo)
 Desenvolvido como projeto de portfólio · Marcos V. · 2026
 
 </div>
-
