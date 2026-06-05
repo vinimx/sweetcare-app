@@ -70,6 +70,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(import("./presentation/routes/insights.routes.js"), { prefix: "/api/v1" });
   // Phase 6 (T078 — LGPD data rights):
   await app.register(import("./presentation/routes/data-rights.routes.js"), { prefix: "/api/v1" });
+  // Password reset (forgot-password + reset-password):
+  await app.register(import("./presentation/routes/password-reset.routes.js"), {
+    prefix: "/api/v1",
+  });
   // Phase 6 (T079 — Prometheus metrics, no /api/v1 prefix):
   await app.register(import("./presentation/routes/monitoring.routes.js"));
 

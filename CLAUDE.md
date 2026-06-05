@@ -151,7 +151,8 @@ sweetcare-app/
 │   │   │   │   ├── audit/
 │   │   │   │   │   └── audit.service.ts    ← Append-only; nunca expõe UPDATE/DELETE
 │   │   │   │   ├── auth/
-│   │   │   │   │   └── auth.service.ts     ← register, login, refresh, logout, grantConsent
+│   │   │   │   │   ├── auth.service.ts          ← register, login, refresh, logout, grantConsent
+│   │   │   │   │   └── password-reset.service.ts ← requestPasswordReset (Redis TTL 1h), resetPassword (revoga sessões)
 │   │   │   │   └── services/
 │   │   │   │       ├── insulin-record.service.ts      ← createInsulinRecord, updateInsulinRecord, deleteInsulinRecord, listInsulinRecords
 │   │   │   │       ├── symptom-record.service.ts      ← createSymptomRecord, updateSymptomRecord, deleteSymptomRecord, listSymptomRecords (dispara alerta)
@@ -161,6 +162,10 @@ sweetcare-app/
 │   │   │   ├── infrastructure/
 │   │   │   │   ├── ai/
 │   │   │   │   │   └── ai-service-client.ts  ← callAnalyze (30s timeout + circuit breaker 3/30s)
+│   │   │   │   ├── cache/
+│   │   │   │   │   └── redis.client.ts       ← Redis singleton (ioredis); usado para tokens de reset de senha
+│   │   │   │   ├── email/
+│   │   │   │   │   └── resend.service.ts     ← sendPasswordResetEmail (deep link sweetcare://)
 │   │   │   │   ├── auth/
 │   │   │   │   │   ├── jwt.plugin.ts       ← authenticate + requireRole decorators
 │   │   │   │   │   ├── password.service.ts ← argon2id (64MB, 3 iter, parallelism=1)
@@ -194,7 +199,8 @@ sweetcare-app/
 │   │   │       ├── alerts.routes.ts        ← GET /patients/:id/alerts, GET /alerts/:id, PATCH /alerts/:id/resolve
 │   │   │       ├── insights.routes.ts      ← POST /insights/reports (202), GET /insights/reports/:id, GET /insights/reports
 │   │   │       ├── data-rights.routes.ts   ← GET /users/me/data-export, DELETE /users/me (LGPD Art. 18)
-│   │   │       └── monitoring.routes.ts    ← GET /metrics (Prometheus text format 0.0.4, sem dependências externas)
+│   │   │       ├── monitoring.routes.ts    ← GET /metrics (Prometheus text format 0.0.4, sem dependências externas)
+│   │   │       └── password-reset.routes.ts ← POST /auth/forgot-password, POST /auth/reset-password
 │   │   └── tests/
 │   │       ├── setup.ts               ← env vars de test + crypto stub
 │   │       └── integration/
@@ -211,9 +217,11 @@ sweetcare-app/
 │   │   │   ├── _layout.tsx            ← QueryClient + ThemeProvider + AuthProvider + AuthGate + Stack (inclui patients/edit/[id])
 │   │   │   ├── emergency.tsx          ← Protocolo de emergência fullscreen (offline, 5 protocolos, SAMU/Bombeiros)
 │   │   │   ├── auth/
-│   │   │   │   ├── _layout.tsx        ← Stack auth com animação fade
-│   │   │   │   ├── login.tsx          ← Email + senha, error banner, link para registro
-│   │   │   │   └── register.tsx       ← Nome + email + senha + confirmação, link para login
+│   │   │   │   ├── _layout.tsx           ← Stack auth com animação fade
+│   │   │   │   ├── login.tsx             ← Email + senha, error banner, links para registro e esqueci-senha
+│   │   │   │   ├── register.tsx          ← Nome + email + senha + confirmação, link para login
+│   │   │   │   ├── forgot-password.tsx   ← Email input → POST /auth/forgot-password; estado "enviado" com instrução de spam
+│   │   │   │   └── reset-password.tsx    ← Nova senha + confirmação; recebe token via deep link sweetcare://auth/reset-password?token=
 │   │   │   ├── (tabs)/
 │   │   │   │   ├── _layout.tsx        ← Tab nav: Início / Registrar / Insights / Perfil
 │   │   │   │   ├── index.tsx          ← Timeline: FlatList de DoseCard/SymptomCard/AlertCard por data
@@ -351,6 +359,8 @@ sweetcare-app/
 | Zod                         | 3.23   | Validação de schema                |
 | Pino                        | 9.5    | Structured logging + PHI redaction |
 | argon2                      | 0.41   | Password hashing (argon2id)        |
+| ioredis                     | 5.x    | Redis client (tokens de reset)     |
+| resend                      | 4.x    | Envio de e-mail transacional       |
 
 ### Mobile (apps/mobile)
 
@@ -444,17 +454,19 @@ User            ──< UserSession   (família de tokens / family invalidation)
 
 ### Autenticação e Sessão
 
-| Método | Rota                  | Auth                          | Status          |
-| ------ | --------------------- | ----------------------------- | --------------- |
-| GET    | `/users/me`           | Bearer                        | ✅ Implementado |
-| PATCH  | `/users/me`           | Bearer                        | ✅ Implementado |
-| POST   | `/auth/register`      | —                             | ✅ Implementado |
-| POST   | `/auth/login`         | —                             | ✅ Implementado |
-| POST   | `/auth/refresh`       | Cookie ou body `refreshToken` | ✅ Implementado |
-| POST   | `/auth/logout`        | Bearer                        | ✅ Implementado |
-| POST   | `/auth/mfa/verify`    | —                             | 🔲 Stub (501)   |
-| POST   | `/consent`            | Bearer                        | ✅ Implementado |
-| DELETE | `/consent/:consentId` | Bearer                        | ✅ Implementado |
+| Método | Rota                    | Auth                          | Status          |
+| ------ | ----------------------- | ----------------------------- | --------------- |
+| GET    | `/users/me`             | Bearer                        | ✅ Implementado |
+| PATCH  | `/users/me`             | Bearer                        | ✅ Implementado |
+| POST   | `/auth/register`        | —                             | ✅ Implementado |
+| POST   | `/auth/login`           | —                             | ✅ Implementado |
+| POST   | `/auth/refresh`         | Cookie ou body `refreshToken` | ✅ Implementado |
+| POST   | `/auth/logout`          | Bearer                        | ✅ Implementado |
+| POST   | `/auth/forgot-password` | —                             | ✅ Implementado |
+| POST   | `/auth/reset-password`  | —                             | ✅ Implementado |
+| POST   | `/auth/mfa/verify`      | —                             | 🔲 Stub (501)   |
+| POST   | `/consent`              | Bearer                        | ✅ Implementado |
+| DELETE | `/consent/:consentId`   | Bearer                        | ✅ Implementado |
 
 > `POST /auth/register` e `POST /auth/login` retornam `refreshToken` tanto no body JSON quanto em cookie HttpOnly — body necessário para clientes mobile (React Native `fetch` não persiste cookies); cookie para web.
 
@@ -688,6 +700,7 @@ docker compose -f infra/docker/compose.dev.yml logs -f    # Logs
 | `REDIS_URL`                  | **Sim**                     | Connection string Redis                                                                                                                                  |
 | `AI_SERVICE_URL`             | Não (padrão localhost:8000) | URL interna do AI service                                                                                                                                |
 | `AI_SERVICE_TIMEOUT_MS`      | Não (padrão 30000)          | Timeout para AI service                                                                                                                                  |
+| `RESEND_API_KEY`             | Não (reset de senha)        | API key do Resend. Sem ela, token é gerado e salvo no Redis mas o e-mail não é enviado (erro logado).                                                    |
 | `CORS_ALLOWED_ORIGINS`       | Não                         | Origens CORS separadas por vírgula                                                                                                                       |
 | `LOG_LEVEL`                  | Não (padrão info)           | `trace` \| `debug` \| `info` \| `warn` \| `error` \| `fatal`                                                                                             |
 
@@ -1386,3 +1399,33 @@ Impacto: `app/(tabs)/insights.tsx` — `useState<string | null>(null)`, import d
 - `app/(tabs)/insights.tsx` — `useState` + import `ReportDetailScreen` + `onSelectReport` wired
 
 _Última atualização: 2026-05-30 — Insights interativos: stats grid + confidence chart + Share API_
+
+### 2026-06-04 — Fluxo de esqueci a senha (Redis + Resend + deep link)
+
+**Decisão: token de reset armazenado no Redis (não em tabela PostgreSQL)**
+Motivação: Tokens de reset têm TTL curto (1h) e são descartados após uso — semântica de cache, não de dado persistente. Redis com `EX 3600` elimina a necessidade de job de limpeza, migration e índice. O hash SHA-256 do token é a chave (`pwd_reset:{hash}`) — nunca o token bruto.
+
+**Decisão: `requestPasswordReset` sempre retorna 200, independente de o e-mail existir**
+Motivação: Retornar 404 ou mensagem diferente quando o e-mail não está cadastrado permite enumeração de usuários. Resposta fixa ("Se este e-mail estiver cadastrado…") elimina o vetor OWASP A01 (enumeração).
+
+**Decisão: falha de entrega de e-mail (Resend) não bloqueia a resposta**
+Motivação: O token já está salvo no Redis antes do envio. Se o Resend retornar erro (rate limit, domínio não verificado, indisponibilidade), o erro é apenas logado — o usuário recebe 200. Isso evita que falhas de infraestrutura de e-mail exponham o fluxo interno e permite reenvio manual em suporte.
+
+**Decisão: deep link `sweetcare://auth/reset-password?token=RAW_TOKEN`**
+Motivação: O scheme `sweetcare://` já estava configurado em `app.json`. O token bruto vai na query string — o servidor recebe, computa `SHA256(token)` e busca no Redis. Token nunca é armazenado em texto puro nem no servidor nem no cliente (Expo Router recebe apenas via `useLocalSearchParams`).
+
+**Decisão: `resetPassword` revoga todas as sessões ativas após troca de senha**
+Motivação: Uma troca de senha motivada por comprometimento de conta deve invalidar todos os refresh tokens existentes (todos os dispositivos). `revokeAllUserSessions(userId, "password_change")` já existia no `session.repository.ts` para este propósito.
+
+**Novos arquivos:**
+
+- `apps/api/src/infrastructure/cache/redis.client.ts` — singleton ioredis
+- `apps/api/src/infrastructure/email/resend.service.ts` — `sendPasswordResetEmail` com HTML + texto simples
+- `apps/api/src/application/auth/password-reset.service.ts` — `requestPasswordReset` + `resetPassword`
+- `apps/api/src/presentation/routes/password-reset.routes.ts` — POST /auth/forgot-password (3/15min) + POST /auth/reset-password (5/15min)
+- `apps/mobile/app/auth/forgot-password.tsx` — tela de e-mail com estado "enviado"
+- `apps/mobile/app/auth/reset-password.tsx` — tela de nova senha com estados: token ausente / form / sucesso
+
+**Nova variável de ambiente:** `RESEND_API_KEY` (opcional; sem ela, e-mail não é enviado mas token é gerado)
+
+_Última atualização: 2026-06-04 — Fluxo de esqueci a senha: Redis + Resend + deep link sweetcare://_

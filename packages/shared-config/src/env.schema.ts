@@ -26,6 +26,9 @@ export const apiEnvSchema = z.object({
   AI_SERVICE_URL: z.string().url().default("http://ai-service:8000"),
   AI_SERVICE_TIMEOUT_MS: z.coerce.number().int().default(30000),
 
+  // Email (Resend) — password reset
+  RESEND_API_KEY: z.string().min(1).optional(),
+
   // CORS
   CORS_ALLOWED_ORIGINS: z.string().default(""),
 

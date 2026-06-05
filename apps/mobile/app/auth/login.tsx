@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   ScrollView,
@@ -17,39 +17,13 @@ import { Icon } from "../../src/design/components/ui/Icon.js";
 import { useTheme } from "../../src/design/contexts/ThemeContext.js";
 import { useAuth } from "../../src/infrastructure/auth/AuthContext.js";
 import { ApiError } from "../../src/infrastructure/api/client.js";
+import { SCREEN_HEIGHT } from "../../src/design/themes/layout.js";
+import { easing, duration } from "../../src/design/themes/motion.js";
 
-/** Geometric dot grid rendered as decorative background */
-function DotGrid() {
-  const cols = 11;
-  const rows = 7;
-  const dots = Array.from({ length: rows * cols }, (_, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    return {
-      x: col * 34 + (row % 2 === 0 ? 0 : 17),
-      y: row * 26,
-    };
-  });
-
-  return (
-    <View style={[StyleSheet.absoluteFillObject, { pointerEvents: "none" }]}>
-      {dots.map((d, i) => (
-        <View
-          key={i}
-          style={{
-            position: "absolute",
-            left: d.x,
-            top: d.y,
-            width: 5,
-            height: 5,
-            borderRadius: 2.5,
-            backgroundColor: "rgba(255,255,255,0.16)",
-          }}
-        />
-      ))}
-    </View>
-  );
-}
+// Deep navy — not the clinical blue, the 3am monitoring screen blue.
+// Trusted, present, eyes-open at all hours.
+const HERO_BG = "#1E3A8A";
+const HERO_H = Math.min(Math.round(SCREEN_HEIGHT * 0.44), 380);
 
 export default function LoginScreen() {
   const { theme } = useTheme();
@@ -61,20 +35,61 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const shakeAnim = useRef(new Animated.Value(0)).current;
+  // Entrance: hero content drifts up while form surface rises beneath it
+  const heroOpacity = useRef(new Animated.Value(0)).current;
+  const heroY = useRef(new Animated.Value(14)).current;
+  const formOpacity = useRef(new Animated.Value(0)).current;
+  const formY = useRef(new Animated.Value(10)).current;
+  const shakeX = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(heroOpacity, {
+        toValue: 1,
+        duration: duration.slow,
+        easing: easing.decelerate,
+        useNativeDriver: true,
+      }),
+      Animated.timing(heroY, {
+        toValue: 0,
+        duration: duration.slow,
+        easing: easing.decelerate,
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.delay(160),
+        Animated.parallel([
+          Animated.timing(formOpacity, {
+            toValue: 1,
+            duration: duration.slow,
+            easing: easing.decelerate,
+            useNativeDriver: true,
+          }),
+          Animated.timing(formY, {
+            toValue: 0,
+            duration: duration.slow,
+            easing: easing.decelerate,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+    ]).start();
+  }, [heroOpacity, heroY, formOpacity, formY]);
+
+  function triggerShake() {
+    shakeX.setValue(0);
+    Animated.sequence([
+      Animated.timing(shakeX, { toValue: 7, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -7, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 5, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -5, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  }
 
   const emailError = error === "fill" && !email.trim() ? "Informe o e-mail" : undefined;
   const passwordError = error === "fill" && !password ? "Informe a senha" : undefined;
-
-  function triggerShake() {
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 6, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -6, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
-    ]).start();
-  }
+  const apiError = error && error !== "fill" ? error : null;
 
   async function handleLogin() {
     setError(null);
@@ -87,129 +102,139 @@ export default function LoginScreen() {
     try {
       await login(email.trim().toLowerCase(), password);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        setError("E-mail ou senha incorretos.");
-      } else {
-        setError("Não foi possível conectar. Tente novamente.");
-      }
+      setError(
+        e instanceof ApiError && e.status === 401
+          ? "E-mail ou senha incorretos."
+          : "Não foi possível conectar. Tente novamente.",
+      );
       triggerShake();
     } finally {
       setLoading(false);
     }
   }
 
-  const BRAND_BG = theme.colors.primary.DEFAULT; // #2563EB
-
   return (
-    <View style={[styles.root, { backgroundColor: theme.colors.background.DEFAULT }]}>
-      {/* ── Branded hero section ──────────────────── */}
-      <View
-        style={[
-          styles.hero,
-          {
-            backgroundColor: BRAND_BG,
-            paddingTop: insets.top + 24,
-          },
-        ]}
-      >
-        <DotGrid />
+    <View style={[styles.root, { backgroundColor: HERO_BG }]}>
+      {/* ── Hero ────────────────────────────────────────── */}
+      <View style={[styles.hero, { height: HERO_H, paddingTop: insets.top + 20 }]}>
+        {/* Ambient depth — two concentric glows, upper-right, no gradients */}
+        <View style={styles.glowOuter} accessible={false} />
+        <View style={styles.glowInner} accessible={false} />
 
-        {/* Logo mark */}
-        <View style={styles.logoMark}>
-          <View style={styles.logoInner}>
-            <Icon name="heart" size="xl" color="#fff" />
+        <Animated.View
+          style={[styles.heroContent, { opacity: heroOpacity, transform: [{ translateY: heroY }] }]}
+        >
+          {/* Brand mark — small, corner-anchored, like an app you already trust */}
+          <View style={styles.brandRow}>
+            <Icon name="activity" size="sm" color="rgba(255,255,255,0.75)" />
+            <Text style={styles.brandWordmark}>SweetCare</Text>
           </View>
-          <View style={styles.logoPing} />
-        </View>
 
-        {/* Brand text */}
-        <Text variant="h1" color="#fff" align="center" style={styles.appName}>
-          SweetCare
-        </Text>
-        <Text variant="bodySm" color="rgba(255,255,255,0.72)" align="center" style={styles.tagline}>
-          Cuidado preciso para crianças com T1DM
-        </Text>
+          {/* Dual-register headline — context whispers, statement asserts */}
+          <View style={styles.heroFooter}>
+            <Text style={styles.hlContext}>Bem-vindo</Text>
+            <Text style={styles.hlMain}>de volta.</Text>
+          </View>
+        </Animated.View>
       </View>
 
-      {/* ── Form section ─────────────────────────── */}
+      {/* ── Form surface — rises from beneath the hero ── */}
       <KeyboardAvoidingView
-        style={styles.flex}
+        style={styles.kavWrapper}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <ScrollView
-          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <Animated.View
+          style={[
+            styles.formSurface,
+            {
+              backgroundColor: theme.colors.background.DEFAULT,
+              opacity: formOpacity,
+              transform: [{ translateY: formY }],
+            },
+          ]}
         >
-          <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
-            {/* Error banner */}
-            {error && error !== "fill" && (
-              <View
-                style={[
-                  styles.errorBanner,
-                  {
-                    backgroundColor: theme.colors.error.surface,
-                    borderColor: theme.colors.error.border,
-                  },
-                ]}
-              >
-                <Icon name="alert-circle" size="sm" color={theme.colors.error.DEFAULT} />
-                <Text variant="bodySm" color={theme.colors.error.DEFAULT} style={styles.errorText}>
-                  {error}
-                </Text>
+          {/* Drag handle — signals scrollability, adds tactile quality */}
+          <View style={[styles.handle, { backgroundColor: theme.colors.border.DEFAULT }]} />
+
+          <ScrollView
+            contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 44 }]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Animated.View style={{ transform: [{ translateX: shakeX }] }}>
+              {/* API-level error — left-border accent, not a full box */}
+              {apiError && (
+                <View
+                  style={[
+                    styles.errorStripe,
+                    {
+                      backgroundColor: theme.colors.error.surface,
+                      borderLeftColor: theme.colors.error.DEFAULT,
+                    },
+                  ]}
+                >
+                  <Text variant="bodySm" color={theme.colors.error.DEFAULT}>
+                    {apiError}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.fields}>
+                <Input
+                  label="E-mail"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChangeText={(v) => {
+                    setEmail(v);
+                    if (error) setError(null);
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  error={emailError}
+                  accessibilityLabel="Campo de e-mail"
+                />
+                <Input
+                  label="Senha"
+                  placeholder="Sua senha"
+                  value={password}
+                  onChangeText={(v) => {
+                    setPassword(v);
+                    if (error) setError(null);
+                  }}
+                  secureToggle
+                  textContentType="password"
+                  error={passwordError}
+                  accessibilityLabel="Campo de senha"
+                />
               </View>
-            )}
 
-            {/* Form fields */}
-            <Text variant="h3" style={styles.formTitle}>
-              Entrar na conta
-            </Text>
-
-            <View style={styles.fields}>
-              <Input
-                label="E-mail"
-                placeholder="seu@email.com"
-                value={email}
-                onChangeText={(v) => {
-                  setEmail(v);
-                  if (error) setError(null);
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                textContentType="emailAddress"
-                error={emailError}
-                accessibilityLabel="Campo de e-mail"
-                leftElement={<Icon name="mail" size="sm" color={theme.colors.text.tertiary} />}
+              <Button
+                variant="primary"
+                size="lg"
+                label="Entrar no SweetCare"
+                onPress={() => void handleLogin()}
+                loading={loading}
+                fullWidth
+                accessibilityLabel="Entrar na conta SweetCare"
               />
-              <Input
-                label="Senha"
-                placeholder="Sua senha"
-                value={password}
-                onChangeText={(v) => {
-                  setPassword(v);
-                  if (error) setError(null);
-                }}
-                secureToggle
-                textContentType="password"
-                error={passwordError}
-                accessibilityLabel="Campo de senha"
-                leftElement={<Icon name="lock" size="sm" color={theme.colors.text.tertiary} />}
-              />
-            </View>
 
-            <Button
-              variant="primary"
-              size="lg"
-              label="Entrar"
-              onPress={() => void handleLogin()}
-              loading={loading}
-              fullWidth
-              accessibilityLabel="Entrar na conta SweetCare"
-            />
+              <Link href="/auth/forgot-password" asChild>
+                <TouchableOpacity
+                  style={styles.forgotBtn}
+                  accessibilityRole="link"
+                  accessibilityLabel="Esqueci a senha"
+                >
+                  <Text variant="bodySm" color={theme.colors.text.secondary}>
+                    Esqueci a senha
+                  </Text>
+                </TouchableOpacity>
+              </Link>
+            </Animated.View>
 
-            <View style={styles.registerRow}>
-              <Text variant="bodySm" color={theme.colors.text.secondary}>
+            <View style={styles.createRow}>
+              <Text variant="bodySm" color={theme.colors.text.tertiary}>
                 Não tem conta?{" "}
               </Text>
               <Link href="/auth/register" asChild>
@@ -217,28 +242,15 @@ export default function LoginScreen() {
                   <Text
                     variant="bodySm"
                     color={theme.colors.primary.DEFAULT}
-                    style={styles.registerLink}
+                    style={styles.createLink}
                   >
                     Criar conta
                   </Text>
                 </TouchableOpacity>
               </Link>
             </View>
-          </Animated.View>
-
-          {/* LGPD footer */}
-          <View style={styles.lgpdRow}>
-            <Icon name="lock" size="xs" color={theme.colors.text.tertiary} />
-            <Text
-              variant="caption"
-              color={theme.colors.text.tertiary}
-              align="center"
-              style={styles.lgpdText}
-            >
-              Dados protegidos por criptografia e LGPD
-            </Text>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </Animated.View>
       </KeyboardAvoidingView>
     </View>
   );
@@ -246,79 +258,118 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  flex: { flex: 1 },
 
-  /* Hero */
+  // ── Hero ──────────────────────────────────────
   hero: {
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingHorizontal: 28,
     overflow: "hidden",
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
   },
-  logoMark: {
-    width: 72,
-    height: 72,
-    marginBottom: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoInner: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.22)",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.45)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoPing: {
+
+  // Two concentric glows, upper-right, blue-on-navy depth
+  glowOuter: {
     position: "absolute",
-    top: -4,
-    right: -4,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#22C55E",
-    borderWidth: 2,
-    borderColor: "#fff",
+    top: -80,
+    right: -60,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "#2563EB",
+    opacity: 0.22,
   },
-  appName: { fontWeight: "700", letterSpacing: -0.5, marginBottom: 6 },
-  tagline: { lineHeight: 20 },
+  glowInner: {
+    position: "absolute",
+    top: 10,
+    right: 50,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "#60A5FA",
+    opacity: 0.12,
+  },
 
-  /* Form */
-  scroll: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
+  heroContent: {
+    flex: 1,
   },
-  formTitle: { marginBottom: 24 },
-  fields: { gap: 16, marginBottom: 24 },
-  errorBanner: {
+  brandRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 7,
+  },
+  brandWordmark: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.65)",
+    letterSpacing: 0.4,
+    includeFontPadding: false,
+  },
+
+  // Headline anchored to bottom of hero — empty space above is a design element
+  heroFooter: {
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingBottom: 20,
+  },
+  hlContext: {
+    fontSize: 17,
+    fontWeight: "400",
+    color: "rgba(255,255,255,0.52)",
+    marginBottom: 2,
+    letterSpacing: 0.1,
+    includeFontPadding: false,
+  },
+  hlMain: {
+    fontSize: 38,
+    fontWeight: "700",
+    color: "#ffffff",
+    letterSpacing: -0.8,
+    lineHeight: 42,
+    includeFontPadding: false,
+  },
+
+  // ── Form ──────────────────────────────────────
+  kavWrapper: { flex: 1 },
+
+  // Organic scoop edge — form surface rises over hero with rounded top corners
+  formSurface: {
+    flex: 1,
+    marginTop: -28,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 12,
+  },
+
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 28,
+  },
+
+  scroll: { paddingHorizontal: 24 },
+
+  errorStripe: {
+    borderLeftWidth: 3,
+    borderRadius: 8,
     padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingLeft: 14,
     marginBottom: 20,
   },
-  errorText: { flex: 1 },
-  registerRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 20,
-  },
-  registerLink: { fontWeight: "600" },
 
-  /* Footer */
-  lgpdRow: {
-    flexDirection: "row",
+  fields: { gap: 20, marginBottom: 28 },
+
+  forgotBtn: {
     alignItems: "center",
+    marginTop: 16,
+    minHeight: 44,
     justifyContent: "center",
-    gap: 6,
-    marginTop: 36,
   },
-  lgpdText: { lineHeight: 16 },
+
+  createRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 32,
+  },
+  createLink: { fontWeight: "600" },
 });
