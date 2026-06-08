@@ -25,10 +25,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { isLoading, isAuthenticated } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const splashHidden = React.useRef(false);
 
   useEffect(() => {
     if (isLoading) return;
-    void SplashScreen.hideAsync();
+    if (!splashHidden.current) {
+      splashHidden.current = true;
+      void SplashScreen.hideAsync().catch(() => undefined);
+    }
     const inAuth = segments[0] === "auth";
     if (!isAuthenticated && !inAuth) {
       router.replace("/auth/login");
