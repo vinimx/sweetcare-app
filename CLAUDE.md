@@ -1429,3 +1429,16 @@ Motivação: Uma troca de senha motivada por comprometimento de conta deve inval
 **Nova variável de ambiente:** `RESEND_API_KEY` (opcional; sem ela, e-mail não é enviado mas token é gerado)
 
 _Última atualização: 2026-06-04 — Fluxo de esqueci a senha: Redis + Resend + deep link sweetcare://_
+
+### 2026-06-08 — Fix: glucoseBeforeMgdl / glucoseReadingMgdl não eram criptografados
+
+**Causa raiz**: Os repositórios convertem `glucoseBeforeMgdl` / `glucoseReadingMgdl` para `String()` antes de passar ao Prisma (necessário porque o schema Prisma define esses campos como `String?`). O `encryptPhiFields` em `encryption-middleware.ts` só cifrava int-PHI-fields quando `typeof value === "number"`. Como o valor já chegava como string, a criptografia era pulada e o número bruto (ex: `"180"`) era armazenado no DB sem cifrar.
+
+Na leitura, `decrypt("180")` lançava exceção (não é ciphertext válido). O catch anterior deixava o campo como string. O schema Zod `z.number().nullable()` da rota de timeline rejeitava a string → `FST_ERR_RESPONSE_SERIALIZATION` (500) → React Query falhava silenciosamente → timeline sempre retornava vazia → mobile mostrava "Sem registros ainda" para qualquer paciente com registro de glicemia.
+
+**Fix em `encryption-middleware.ts`**:
+
+- `encryptPhiFields`: aceita `typeof === "string"` além de `typeof === "number"` para int-PHI-fields, cobrindo o caso em que o repositório já fez a conversão.
+- `decryptPhiFields`: fallback no catch — se `decrypt()` falhar (registro legado sem criptografia), tenta `parseInt()` diretamente. Garante retrocompatibilidade com registros já gravados no DB com valor plaintext.
+
+**Impacto**: Registros criados após o fix terão `glucoseBeforeMgdl`/`glucoseReadingMgdl` corretamente cifrados. Registros legados são lidos via fallback (valor numérico correto) e recifrados na próxima operação de update.

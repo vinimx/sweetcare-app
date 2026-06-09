@@ -73,7 +73,11 @@ export function encryptPhiFields(modelName: string, data: PlainRecord): PlainRec
     }
   }
   for (const field of intFields) {
-    if (result[field] != null && typeof result[field] === "number") {
+    // Accept number OR string: repositories pre-convert to String() to satisfy Prisma's String? type.
+    if (
+      result[field] != null &&
+      (typeof result[field] === "number" || typeof result[field] === "string")
+    ) {
       result[field] = encrypt(String(result[field]));
     }
   }
@@ -100,7 +104,9 @@ export function decryptPhiFields(modelName: string, data: PlainRecord | null): P
       try {
         result[field] = parseInt(decrypt(result[field]), 10);
       } catch {
-        // Leave as string if decryption fails
+        // Fallback for legacy records stored without encryption: parse the raw number string.
+        const direct = parseInt(result[field] as string, 10);
+        result[field] = isNaN(direct) ? null : direct;
       }
     }
   }
